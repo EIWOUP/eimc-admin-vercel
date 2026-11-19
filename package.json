@@ -1,0 +1,14 @@
+{
+  "name": "eimc-admin",
+  "private": true,
+  "type": "module",
+  "description": "EIMC-Admin: control room for the eimc.vercel.app database (static pages + /api functions on PostgreSQL)",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "node tools/dev-server.mjs"
+  },
+  "dependencies": {
+    "nodemailer": "6.9.16",
+    "pg": "8.13.1"
+  }
+}

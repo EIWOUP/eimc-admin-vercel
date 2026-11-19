@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<script>try{document.documentElement.style.setProperty("--dpr",String(devicePixelRatio||1));if(localStorage.getItem("eimc.theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}</script>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EIMC Admin</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#06080d">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2064%2064%22%3E%3Crect%20x%3D%224%22%20y%3D%224%22%20width%3D%2256%22%20height%3D%2256%22%20rx%3D%2215%22%20fill%3D%22%23141821%22%2F%3E%3C%2Fsvg%3E">
+<link rel="stylesheet" href="/static/vendor/fonts.css">
+<link rel="stylesheet" href="/fonts/arimo.css">
+<link rel="stylesheet" href="/static/css/boot.css">
+<link rel="stylesheet" href="/css/site.css">
+<link rel="stylesheet" href="/css/account.css">
+<link rel="stylesheet" href="/css/admin.css">
+<link rel="preload" as="font" type="font/woff2" crossorigin href="/fonts/Arimo-latin.woff2">
+<link rel="modulepreload" href="/static/js/logo.js">
+<link rel="modulepreload" href="/js/admin/core.js">
+<link rel="modulepreload" href="/js/admin/charts.js">
+</head>
+<body class="adm">
+<div class="amb" aria-hidden="true"><i></i><i></i><i></i></div>
+
+<aside class="sb" id="sb">
+  <a class="sb-brand" href="#/overview">
+    <div class="brand-mark" data-mark data-size="28"></div>
+    <div class="sb-t"><b>EIMC</b><span>ADMIN CONTROL</span></div>
+  </a>
+  <nav class="sb-nav" id="sb-nav" aria-label="Admin sections"></nav>
+  <div class="sb-foot">
+    <div class="sb-db" id="sb-db"><i></i><span>Database <b>connecting…</b></span></div>
+    <a class="sb-site" href="https://eimc.vercel.app" target="_blank" rel="noopener">Open eimc.vercel.app <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg></a>
+  </div>
+</aside>
+
+<div class="mn">
+  <header class="tb">
+    <button type="button" class="tb-burger" id="burger" aria-label="Menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="tb-crumb" id="crumb"><b>Overview</b></div>
+    <button type="button" class="tb-k" id="open-k" aria-label="Search (Ctrl K)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <span>Search users, orders, pages…</span><kbd>Ctrl K</kbd>
+    </button>
+    <div class="tb-pulse" id="pulse" title="Customers with a session used in the last 15 minutes"><i></i><b>–</b> online</div>
+    <button type="button" class="ic-btn" id="refresh" aria-label="Refresh data" title="Refresh (R)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    <button type="button" class="theme-tg" data-theme-toggle aria-label="Switch theme" title="Switch theme">
+      <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M4.6 4.6l1.6 1.6M17.8 17.8l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.6 19.4l1.6-1.6M17.8 6.2l1.6-1.6"/></svg>
+      <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 14.2A8.5 8.5 0 0 1 9.8 3.5a8.5 8.5 0 1 0 10.7 10.7Z"/></svg>
+    </button>
+    <div class="tb-me acct" id="me">
+      <button type="button" class="acct-btn" aria-haspopup="menu" aria-expanded="false" aria-label="Admin menu"><span class="acct-av">AD</span><span class="acct-plan">Admin</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+      <div class="acct-pop" role="menu">
+        <div class="acct-who"><span class="acct-av">AD</span><div><b>EIMC Admin</b><span id="me-id">—</span></div></div>
+        <a href="#/activity" role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Audit trail</a>
+        <a href="#/sql" role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m8 6-6 6 6 6M16 6l6 6-6 6M14 4l-4 16"/></svg>SQL console</a>
+        <a href="https://eimc.vercel.app" target="_blank" rel="noopener" role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>Live website</a>
+        <hr>
+        <button type="button" data-logout role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 17l5-5-5-5M15 12H3"/></svg>Sign out</button>
+      </div>
+    </div>
+  </header>
+  <main class="view" id="view" tabindex="-1"></main>
+</div>
+
+<div class="cmdk" id="cmdk" hidden></div>
+<div class="modal" id="modal" hidden></div>
+<div class="tip" id="tip" role="tooltip"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="module" src="/js/boot.js"></script>
+<script type="module" src="/js/admin/app.js"></script>
+</body>
+</html>

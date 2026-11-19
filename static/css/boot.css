@@ -1,0 +1,528 @@
+/* =====================================================================
+   EIMC Terminal — product theme, extracted VERBATIM from the app.
+
+   Source: EIMC v1.25.218.93 / static/css/app.css
+     :root design tokens ....... app.css   1- 48
+     EIMC mark (logo.js) ....... app.css 109-195
+     boot splash ............... app.css 197-294
+     dropdown menu base ........ app.css 354-364
+     modes menu (mode tiles) ... app.css 1917-2181
+
+   Rules below are unmodified. The app's layout rules (.app, .topbar,
+   html/body overflow:hidden) are deliberately NOT carried over - they
+   would fight the website's own layout. Website layout: /css/site.css
+   ===================================================================== */
+
+/* =====================================================================
+   EIMC Terminal — design system
+   ===================================================================== */
+:root {
+  --bg-0: #06080d;
+  --bg-1: #0a0e15;
+  --bg-2: #0e131c;
+  --bg-3: #141a26;
+  --bg-4: #1a2231;
+  --line: #19202d;
+  --line-2: #232c3c;
+  --line-3: #2e394c;
+  --text-0: #eef1f7;
+  --text-1: #c3cad7;
+  --text-2: #8691a5;
+  --text-3: #5b6578;
+  --accent: #4c7dff;
+  --accent-2: #8b5cf6;
+  --accent-soft: rgba(76, 125, 255, .14);
+  --accent-glow: 0 0 0 1px rgba(76,125,255,.45), 0 6px 24px -6px rgba(76,125,255,.55);
+  --bull: #089981;
+  --bull-hi: #22d3a6;
+  --bull-soft: rgba(8, 153, 129, .15);
+  --bear: #f23645;
+  --bear-hi: #ff6b78;
+  --bear-soft: rgba(242, 54, 69, .15);
+  --warn: #f5b841;
+  --warn-soft: rgba(245, 184, 65, .14);
+  /* option roles: buyers green (B), sellers / writers red (S) */
+  --buyer: #089981;
+  --buyer-hi: #22d3a6;
+  --buyer-soft: rgba(8, 153, 129, .16);
+  --seller: #f23645;
+  --seller-hi: #ff6b78;
+  --seller-soft: rgba(242, 54, 69, .16);
+  --info: #38bdf8;
+  --violet: #b39dff;
+  --radius: 10px;
+  --radius-sm: 7px;
+  --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-num: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --shadow-lg: 0 24px 60px -12px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04);
+  --ease: cubic-bezier(.2,.8,.2,1);
+  --ease-back: cubic-bezier(.34,1.56,.64,1);
+  --wl-w: 252px;
+  --ins-w: 372px;
+  --tool-w: 44px;
+}
+
+/* ------------------------------------------------------- EIMC mark (logo.js, mark.js)
+   everything is written on unfolded paper: a sheet unfolded from quarters, and on it the journey —
+   an order-flow heatmap and a price line in broad-nib ink, drawn by mark.js on the canvas, whose tip
+   is the live price. 1em = size / 64; --mkT stretches the boot. */
+.mk { --mkT: 1; position: relative; display: block; flex: none; width: var(--mk); height: var(--mk); font-size: calc(var(--mk) / 64); }
+/* The sheet's cast shadow. It lives out here, on the mark itself, and not as a drop-shadow()
+   filter on .mk-3d: a filter wrapping the folding subtree made the browser re-render the whole
+   sheet into a buffer and re-blur it on *every* frame of the unfold and of the splash's flight
+   into the top bar, on the main thread, which is exactly where the dropped frames were coming
+   from. A static box-shadow on the sheet's own footprint is the same picture for free. */
+.mk::before { content: ""; position: absolute; left: 4em; top: 4em; width: 56em; height: 56em;
+  border-radius: 15em; box-shadow: 0 5em 8em rgba(0,0,0,.65); pointer-events: none; }
+.mk-3d { position: absolute; inset: 0; }
+.mk-persp, .mk-sheet { position: absolute; inset: 0; }
+.mk-sheet { perspective: 140em; }
+/* The sheet: carbon, with a chart grid ruled across it. Kept in step with
+   static/js/theme.js -- that module writes these same values onto :root at startup, and the
+   literals here are only the fallback for the instant before scripts run. */
+.mk-f { position: absolute; overflow: hidden;
+  background:
+    repeating-linear-gradient(90deg, var(--mk-grid, rgba(255,255,255,.075)) 0 .4em, transparent .4em 8em) 0 0 / 56em 56em,
+    repeating-linear-gradient(0deg, var(--mk-grid, rgba(255,255,255,.075)) 0 .4em, transparent .4em 8em) 0 0 / 56em 56em,
+    linear-gradient(135deg, var(--mk-sheet-a, #1b1f24) 0%, var(--mk-sheet-b, #141821) 50%, var(--mk-sheet-c, #0e1116) 100%) 0 0 / 56em 56em; }
+.mk-f::before, .mk-fr::after, .mk-bk::after, .mk-bt::after { content: ""; position: absolute; inset: 0; pointer-events: none; }
+.mk-tl { left: 4em; top: 4em; width: 28em; height: 28em; border-radius: 15em 0 0 0; }
+.mk-tl::before { background: linear-gradient(135deg, var(--mk-lift, rgba(255,255,255,.028)), rgba(255,255,255,.01)); }
+.mk-tl, .mk-fr { box-shadow: inset 0 1.1em 1em -.9em var(--mk-edge, rgba(255,255,255,.10)); }
+.mk-tr { position: absolute; left: 32em; top: 4em; width: 28em; height: 28em; transform-origin: 0 50%; transform-style: preserve-3d; }
+.mk-fr { inset: 0; border-radius: 0 15em 0 0; background-position: -28em 0; backface-visibility: hidden; }
+.mk-fr::before { background: linear-gradient(90deg, var(--mk-dip, rgba(0,0,0,.15)), rgba(0,0,0,.05)); }
+.mk-fr::after { background: var(--mk-back, #0a0c10); opacity: 0; }
+/* the reverse of the right flap: the face you see on the unfold's very first frame, before it
+   swings over. It is the same carbon sheet from behind (theme.js, --mk-bk) -- it used to carry
+   the retired theme's indigo, and every boot opened with a blue flash. */
+.mk-bk { position: absolute; inset: 0; overflow: hidden; border-radius: 15em 0 0 0; transform: rotateY(180deg); backface-visibility: hidden;
+  background: linear-gradient(135deg, var(--mk-bk, #15191f), var(--mk-back, #0a0c10));
+  box-shadow: inset 0 0 0 .6em rgba(255,255,255,.055); }
+.mk-bk::after { background: var(--mk-back, #0a0c10); opacity: 0; }
+.mk-bt { left: 4em; top: 32em; width: 56em; height: 28em; border-radius: 0 0 15em 15em; transform-origin: 50% 0; background-position: 0 -28em; }
+.mk-bt::before { background: linear-gradient(180deg, var(--mk-dip, rgba(0,0,0,.15)), rgba(0,0,0,.06)) 0 0 / 50% 100% no-repeat; }
+.mk-bt::after { background: linear-gradient(160deg, var(--mk-lift, rgba(255,255,255,.028)), rgba(255,255,255,.008)) 100% 0 / 50% 100% no-repeat; }
+.mk-sh { position: absolute; inset: 0; background: var(--mk-back, #0a0c10); opacity: 0; }
+/* the journey (mark.js): 1.5 × the mark, so its glow, sparks and rings can spill off the sheet */
+.mk-cv { position: absolute; left: -25%; top: -25%; width: 150%; height: 150%; pointer-events: none; }
+/* once written on, the facets settle flatter so the chart reads clean */
+.mk-tl::before, .mk-fr::before, .mk-bt::before, .mk-bt::after { opacity: .42; }
+
+/* boot: the right flap swings open over the front, the bottom flap comes down from behind, the
+   creases settle, the facets flatten — then mark.js writes the journey.
+   Every one of these animates transform / translate / scale / opacity only, so the compositor
+   can run the whole unfold on its own thread and the app may boot as hard as it likes behind
+   it. will-change promotes each moving part up front, rather than leaving the browser to
+   discover on frame two that it should have. */
+.mk.unfold .mk-3d, .mk.unfold .mk-sheet, .mk.unfold .mk-tr, .mk.unfold .mk-bt {
+  will-change: transform, translate, scale, opacity; }
+.mk.unfold .mk-3d { animation: mkIn calc(.34s * var(--mkT)) cubic-bezier(.2,.8,.3,1) both; }
+.mk.unfold::before { animation: mkCast calc(.92s * var(--mkT)) linear both; }
+.mk.unfold .mk-sheet { animation: mkCenter calc(1.16s * var(--mkT)) linear both; }
+.mk.unfold .mk-tr { animation: mkFlipR calc(.62s * var(--mkT)) calc(.12s * var(--mkT)) both; }
+.mk.unfold .mk-fr::after { animation: mkShadeOut calc(.62s * var(--mkT)) calc(.12s * var(--mkT)) both; }
+.mk.unfold .mk-bk::after { animation: mkShadeIn calc(.62s * var(--mkT)) calc(.12s * var(--mkT)) both; }
+.mk.unfold .mk-bt { animation: mkFlipB calc(.54s * var(--mkT)) calc(.64s * var(--mkT)) both; }
+.mk.unfold .mk-sh { animation: mkShadeOut calc(.54s * var(--mkT)) calc(.64s * var(--mkT)) both; }
+.mk.unfold .mk-tl::before, .mk.unfold .mk-fr::before, .mk.unfold .mk-bt::before, .mk.unfold .mk-bt::after {
+  animation: mkFlatten calc(.7s * var(--mkT)) calc(1.05s * var(--mkT)) ease-in-out both; }
+
+@keyframes mkIn { from { opacity: 0; scale: .5; } }
+@keyframes mkCast { 0% { opacity: 0; } 46% { opacity: .3; } 100% { opacity: 1; } }
+@keyframes mkCenter {
+  0%, 10% { translate: 14em 14em; animation-timing-function: cubic-bezier(.5,0,.3,1); }
+  60% { translate: 0 14em; animation-timing-function: cubic-bezier(.4,0,.25,1); }
+  100% { translate: 0 0; }
+}
+@keyframes mkFlipR {
+  0% { transform: rotateY(-180deg); animation-timing-function: cubic-bezier(.5,0,.25,1); }
+  80% { transform: rotateY(11deg); animation-timing-function: ease-in-out; }
+  100% { transform: rotateY(0deg); }
+}
+@keyframes mkFlipB {
+  0% { transform: rotateX(-90deg); animation-timing-function: cubic-bezier(.3,.55,.35,1); }
+  74% { transform: rotateX(10deg); animation-timing-function: ease-in-out; }
+  100% { transform: rotateX(0deg); }
+}
+@keyframes mkShadeOut { 0%, 42% { opacity: .62; } 100% { opacity: 0; } }
+@keyframes mkShadeIn { 0% { opacity: 0; } 50%, 100% { opacity: .55; } }
+@keyframes mkFlatten { from { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mk *, .mk *::before, .mk *::after { animation: none !important; } }
+
+/* ------------------------------------------------------------------ boot splash */
+body.booting .brand-mark .mk { opacity: 0; }
+.boot { --bt: .5; position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; overflow: hidden;
+  background: #04060b; animation: bootSafe .5s 16s forwards; }
+.boot.quick { --bt: .4; }
+/* One frame before lights out the cover stops being *quite* opaque. A fully opaque layer lets
+   the compositor skip rasterising everything behind it, so the terminal's entire first paint
+   used to land on the one frame the mark starts its flight -- the worst possible moment. This
+   pays for it while the splash still hides it, and is invisible at .4% over near-black. */
+.boot.warm { background: rgba(4,6,11,.996); }
+.boot.go { background: transparent; pointer-events: none; }
+@keyframes bootSafe { to { opacity: 0; visibility: hidden; } }
+/* the sheet, the car on the grid and the launch are drawn on one canvas (launch.js) */
+.boot-fx { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .6s ease; }
+.boot-fx.on { opacity: 1; }
+.boot.go .boot-copy { opacity: 0; transition: opacity .25s ease .12s; }
+.boot-core { position: relative; display: flex; flex-direction: column; align-items: center; margin-top: -4vh; }
+.boot-mark { position: relative; width: 112px; height: 112px; }
+/* the screen is the paper too: two creases run out from the mark once it has unfolded — the
+   horizontal one is the track the car launches along */
+.boot-mark::before, .boot-mark::after { content: ""; position: absolute; left: 50%; top: 50%; pointer-events: none;
+  transition: opacity .3s; will-change: scale, opacity; }
+.boot-mark::before { width: 240vw; height: 1px; translate: -50% 0;
+  background: linear-gradient(90deg, transparent, rgba(160,170,255,.13) 38%, rgba(160,170,255,.02) 47%, transparent 50%, rgba(160,170,255,.02) 53%, rgba(160,170,255,.13) 62%, transparent);
+  animation: bootCreaseX calc(1.4s * var(--bt)) calc(1.1s * var(--bt)) cubic-bezier(.2,.7,.2,1) both; }
+.boot-mark::after { width: 1px; height: 240vh; translate: 0 -50%;
+  background: linear-gradient(180deg, transparent, rgba(160,170,255,.13) 38%, rgba(160,170,255,.02) 47%, transparent 50%, rgba(160,170,255,.02) 53%, rgba(160,170,255,.13) 62%, transparent);
+  animation: bootCreaseY calc(1.4s * var(--bt)) calc(1.1s * var(--bt)) cubic-bezier(.2,.7,.2,1) both; }
+.boot.go .boot-mark::before, .boot.go .boot-mark::after { opacity: 0; }
+.boot-mark .mk { position: relative; z-index: 1; will-change: transform; }
+.boot-copy { display: flex; flex-direction: column; align-items: center; }
+.boot-word { display: flex; margin: 34px -.46em 0 0; font: 800 31px/1 var(--font-ui); letter-spacing: .46em; }
+/* the letters rise into place on transform and opacity alone. They used to blur in as well, and
+   a blur over background-clip: text is about the most expensive thing a browser can animate --
+   four of them repainting every frame, right across the tail of the mark's unfold. */
+.boot-word i { font-style: normal; display: inline-block; background: linear-gradient(180deg, #fff 25%, #aab3ff); -webkit-background-clip: text; background-clip: text; color: transparent;
+  will-change: transform, opacity;
+  animation: bootLetter .8s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc((1s + var(--i) * .09s) * var(--bt)); }
+.boot-sub { margin: 11px -.64em 0 0; font: 700 9.5px/1 var(--font-ui); letter-spacing: .64em; color: #5f6a85;
+  animation: bootFade .8s calc(1.35s * var(--bt)) both; }
+/* the motto: wide-tracked geometric caps between two hairlines. The letters glide in from wider
+   tracking to their places (transform only, so it stays smooth while the app boots), the hairlines
+   draw outwards, then a wave of light runs across the words once. */
+.boot-motto { display: flex; align-items: center; gap: 18px; margin-top: 23px; white-space: nowrap;
+  font: 500 11px/1 Jost, "Futura", "Segoe UI", sans-serif; letter-spacing: .36em; color: #dadcf8; }
+.boot-motto:not(.split) { visibility: hidden; }            /* until logo.js splits it into letters */
+.boot-mt { display: block; margin-right: -.36em; }
+.boot-motto::before, .boot-motto::after { content: ""; flex: none; width: 42px; height: 1px; transform-origin: 100% 50%;
+  background: linear-gradient(90deg, rgba(170,178,255,0), rgba(196,202,255,.65));
+  animation: mottoRule calc(1.1s * var(--bt)) calc(1.5s * var(--bt)) cubic-bezier(.16,1,.3,1) both; }
+.boot-motto::after { transform-origin: 0 50%; background: linear-gradient(270deg, rgba(170,178,255,0), rgba(196,202,255,.65)); }
+/* Thirty-nine letters, and not one filter between them. Each used to glide in under a
+   filter: blur() and then take a filter: brightness() + drop-shadow() for the wave of light --
+   seventy-eight filtered repaints a frame, on the main thread, and the shine's window sat
+   exactly over the mark's flight into the top bar. The glide is now transform and opacity, and
+   the wave is a second, brighter copy of each letter (::after) whose *opacity* is animated: the
+   glow is painted once and never again, so the whole thing rides on the compositor. */
+.boot-motto i { font-style: normal; display: inline-block; position: relative;
+  will-change: transform, opacity;
+  animation: mottoIn calc(1.15s * var(--bt)) calc((1.05s + var(--i) * .006s) * var(--bt)) cubic-bezier(.16,1,.3,1) both; }
+.boot-motto i::after { content: attr(data-c); position: absolute; left: 0; top: 0; color: #fff; opacity: 0;
+  text-shadow: 0 0 5px rgba(186,170,255,.9), 0 0 13px rgba(150,130,255,.45);
+  will-change: opacity; pointer-events: none;
+  animation: mottoShine calc(1.1s * var(--bt)) calc((2.15s + var(--i) * .024s) * var(--bt)) ease-in-out both; }
+@keyframes mottoIn { from { opacity: 0; transform: translateX(calc(var(--d) * .3em)); } }
+@keyframes mottoRule { from { opacity: 0; transform: scaleX(0); } }
+@keyframes mottoShine { 0%, 100% { opacity: 0; } 45% { opacity: .92; } }
+/* F1 start lights on a carbon gantry: they come on one by one while the chart loads — lights out
+   is the launch */
+.boot-lights { display: flex; gap: 8px; margin-top: 30px; padding: 7px 10px; border-radius: 12px;
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,.03) 0 2px, transparent 2px 4px),
+              repeating-linear-gradient(-45deg, rgba(255,255,255,.022) 0 2px, transparent 2px 4px), linear-gradient(180deg, #11141d, #07090e);
+  border: 1px solid #1e2433; box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 16px 34px -16px #000;
+  animation: bootFade .6s calc(1.15s * var(--bt)) both; }
+.boot-lights i { display: flex; flex-direction: column; gap: 5px; padding: 5px; border-radius: 9px; background: #040508; border: 1px solid #161b27;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.8); }
+/* A lamp is two stacked circles -- dark glass, and a lit one over it -- and only the lit one's
+   opacity ever changes. Before, coming on meant animating filter: brightness() and going out
+   meant transitioning background and box-shadow across ten of them: ten gradient-and-shadow
+   repaints a frame, and lights out is the very instant the mark launches. */
+.boot-lights b { position: relative; width: 16px; height: 16px; border-radius: 50%; background: radial-gradient(circle at 36% 30%, #3e1218, #15050a 72%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.05); }
+.boot-lights b::after { content: ""; position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 36% 30%, #fff3f4 0, #ff4e5e 24%, #e4142c 60%, #8c0013 100%);
+  box-shadow: 0 0 8px 1px rgba(255,40,60,.9), 0 0 28px 6px rgba(255,30,50,.4);
+  opacity: 0; will-change: opacity, transform; transition: opacity .17s linear; }
+.boot-lights i.on b::after { opacity: 1; transition: none; animation: lampOn .3s ease-out; }
+@keyframes lampOn { from { opacity: .35; transform: scale(1.22); } }
+.boot-status { margin-top: 13px; height: 12px; font: 600 9.5px/12px var(--font-num); letter-spacing: .16em; text-transform: uppercase; color: #5f6a85;
+  animation: bootFade .6s calc(1.25s * var(--bt)) both; }
+.boot-status b { color: #9aa4c0; }
+.boot-status.out { color: #ff4e5e; font-weight: 800; font-style: italic; letter-spacing: .34em; text-shadow: 0 0 12px rgba(255,60,80,.7); }
+@keyframes bootFade { from { opacity: 0; } }
+@keyframes bootCreaseX { from { scale: 0 1; } }
+@keyframes bootCreaseY { from { scale: 1 0; } }
+@keyframes bootLetter { from { opacity: 0; transform: translateY(16px) scale(.9); } }
+@media (prefers-reduced-motion: reduce) { .boot *, .boot *::before, .boot *::after { animation: none !important; transition: none !important; }
+  .boot.go { opacity: 0; transition: opacity .3s; } }
+
+/* ---------------------------------------------------------- dropdown menus */
+.menu-wrap { position: relative; }
+.menu { position: absolute; top: calc(100% + 8px); left: 0; min-width: 200px; padding: 6px; border-radius: 11px;
+  background: rgba(16,21,31,.97); border: 1px solid var(--line-2); box-shadow: var(--shadow-lg);
+  opacity: 0; transform: translateY(-6px) scale(.98); pointer-events: none; transition: all .18s var(--ease); z-index: 50; }
+.menu.open { opacity: 1; transform: none; pointer-events: auto; }
+.menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 10px; border-radius: 7px; color: var(--text-1); font-weight: 500; }
+.menu button:hover { background: var(--bg-4); color: var(--text-0); }
+.menu button.active { color: var(--accent); }
+.menu button svg { width: 16px; height: 16px; }
+.menu button .hint { margin-left: auto; font-size: 11px; color: var(--text-3); }
+
+/* ------------------------------------------------ modes menu */
+/* One hero tile per mode, all built alike: a live miniature of the mode over its name, tag and description */
+.modes-menu { width: 360px; padding: 6px; }
+.modes-menu .mm-head { display: flex; align-items: baseline; justify-content: space-between; padding: 5px 9px 7px; }
+.modes-menu .mm-head b { font-size: 11px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--text-2); }
+.modes-menu .mm-head span { font-size: 10.5px; color: var(--text-3); }
+@property --md-a { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+/* the header over each tile: an animated glyph, the family in the mode's colours, its reach */
+.mm-hh { display: flex; align-items: center; gap: 8px; padding: 9px 9px 8px; }
+.mm-hh b { font-size: 10px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
+  background: linear-gradient(90deg, var(--h1), var(--h2) 30%, var(--h3) 55%, var(--h1)); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: mdHue 5s linear infinite; }
+.mm-hh em { margin-left: auto; font-style: normal; font-size: 9.5px; color: var(--text-3); }
+.mm-hh.gold { --h1: #ffe0a3; --h2: #ffb74d; --h3: #ff9800; }
+.mm-hh.flow { --h1: #b8f6ff; --h2: #22d3ee; --h3: #7c6cff; }
+.mm-hh.smc { --h1: #f3dcff; --h2: #c084fc; --h3: #f472b6; }
+.mm-hh.heat { --h1: #ffe2b8; --h2: #ffa630; --h3: #ff5e3a; }
+.mm-hs { padding: 0 1px 11px; margin-bottom: 3px; border-bottom: 1px solid var(--line); }
+.gv-ic { display: inline-flex; flex-direction: column; justify-content: center; gap: 1.5px; width: 12px; height: 12px; flex: none; }
+.gv-ic i { display: block; height: 2px; border-radius: 1px; background: linear-gradient(90deg, #ff9800, #ffd27a); transform-origin: left;
+  animation: gvIc 1.6s ease-in-out infinite alternate; }
+.gv-ic i:nth-child(1) { width: 45%; animation-delay: -.4s; } .gv-ic i:nth-child(2) { width: 100%; animation-delay: -.9s; }
+.gv-ic i:nth-child(3) { width: 70%; background: linear-gradient(90deg, #64b5f6, #a8d4fb); animation-delay: -.2s; } .gv-ic i:nth-child(4) { width: 30%; animation-delay: -1.2s; }
+@keyframes gvIc { from { transform: scaleX(.55); } to { transform: scaleX(1); } }
+/* a footprint: sellers left of the wick, buyers right */
+.fl-ic { position: relative; display: inline-flex; flex-direction: column; justify-content: center; gap: 1.5px; width: 12px; height: 12px; flex: none; }
+.fl-ic::before { content: ""; position: absolute; left: 5.5px; top: .5px; bottom: .5px; width: 1px; background: rgba(184,246,255,.55); }
+.fl-ic i { display: block; height: 2px; transform-origin: 6px 50%; animation: gvIc 1.4s ease-in-out infinite alternate;
+  background: linear-gradient(90deg, transparent var(--s), #ff5d73 var(--s), #ff9aa8 5px, transparent 5px 7px, var(--bc, #22d3ee) 7px, #b8f6ff var(--b), transparent var(--b)); }
+.fl-ic i:nth-child(1) { --s: 3px; --b: 11px; animation-delay: -.5s; } .fl-ic i:nth-child(2) { --s: .5px; --b: 10px; animation-delay: -.9s; }
+.fl-ic i:nth-child(3) { --s: 2px; --b: 12px; --bc: #7c6cff; animation-delay: -.3s; } .fl-ic i:nth-child(4) { --s: 0px; --b: 9px; animation-delay: -1.3s; }
+/* structure: a downtrend's zigzag that breaks its last lower high */
+.sm-ic { display: inline-flex; width: 12px; height: 12px; flex: none; }
+.sm-ic svg { width: 12px; height: 12px; overflow: visible; }
+.sm-ic .z { fill: none; stroke: #c084fc; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 20; animation: smIc 2.6s ease-in-out infinite; }
+.sm-ic .k { fill: none; stroke: #f472b6; stroke-width: 1; stroke-dasharray: 1.4 1.1; }
+@keyframes smIc { 0% { stroke-dashoffset: 20; } 55%, 85% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: -20; } }
+/* resting liquidity: a few rows of the heat ramp, one of them a wall */
+.ht-ic { display: inline-flex; flex-direction: column; justify-content: center; gap: 1.5px; width: 12px; height: 12px; flex: none; }
+.ht-ic i { display: block; height: 2px; border-radius: 1px; animation: htIc 1.7s ease-in-out infinite alternate; }
+.ht-ic i:nth-child(1) { width: 70%; background: linear-gradient(90deg, #16549c, #42c0f2); }
+.ht-ic i:nth-child(2) { width: 100%; background: linear-gradient(90deg, #42c0f2, #fcee5c 55%, #ff9624); animation-delay: -.6s; }
+.ht-ic i:nth-child(3) { width: 50%; background: linear-gradient(90deg, #0e2854, #2088d2); animation-delay: -1.1s; }
+.ht-ic i:nth-child(4) { width: 85%; background: linear-gradient(90deg, #2088d2, #a8e8fa); animation-delay: -.3s; }
+@keyframes htIc { from { opacity: .5; } to { opacity: 1; } }
+
+.modes-menu button.md-tile { position: relative; display: block; width: auto; padding: 0; border-radius: 13px; text-align: left;
+  color: var(--text-1); background: transparent; isolation: isolate; cursor: pointer; transition: transform .3s var(--ease); }
+.modes-menu button.md-tile:hover { background: transparent; transform: translateY(-2px); }
+.modes-menu button.md-tile:active { transform: translateY(0) scale(.975); transition-duration: .08s; }
+.md-tile::before { content: ""; position: absolute; inset: 0; z-index: 3; border-radius: inherit; padding: 1px; pointer-events: none;
+  /* a wide, soft sheen that drifts slowly round the border — felt more than seen */
+  background: conic-gradient(from var(--md-a), color-mix(in srgb, var(--mc) 18%, #232c3c) 0 22%,
+    color-mix(in srgb, var(--mc) 55%, #232c3c) 42%, var(--mc) 58%, color-mix(in srgb, var(--mc) 55%, #fff) 66%,
+    var(--mc2) 76%, color-mix(in srgb, var(--mc2) 45%, #232c3c) 90%, color-mix(in srgb, var(--mc) 18%, #232c3c) 100%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  animation: mdSpin 22s linear infinite paused; opacity: .45; transition: opacity .6s; }
+.md-tile:hover::before { animation-play-state: running; opacity: .7; }
+.md-tile.on::before { animation-play-state: running; opacity: .8; }
+.md-tile::after { content: ""; position: absolute; inset: 6px; z-index: 0; border-radius: inherit; pointer-events: none;
+  background: linear-gradient(135deg, var(--mc), var(--mc2)); filter: blur(16px); opacity: 0; transition: opacity .4s; }
+.md-tile:hover::after { opacity: .16; }
+.md-tile.on::after { animation: mdBreath 2.8s ease-in-out infinite; }
+
+.md-in { position: relative; z-index: 1; display: flex; flex-direction: column; margin: 1px; border-radius: 12px; overflow: hidden;
+  background: radial-gradient(130% 90% at 50% 0%, color-mix(in srgb, var(--mc) 7%, #0c111b), #090d15 72%); }
+.md-tile.on .md-in { background: radial-gradient(130% 90% at 50% 0%, color-mix(in srgb, var(--mc) 16%, #0c111b), #090d15 75%); }
+
+.md-viz { position: relative; display: block; height: 74px; overflow: hidden; background: #060910;
+  border-bottom: 1px solid rgba(255,255,255,.06); filter: saturate(.25) brightness(.6); transition: filter .5s var(--ease); }
+.md-tile:hover .md-viz { filter: saturate(.8) brightness(.88); }
+.md-tile.on .md-viz { filter: none; }
+.md-crt { position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(255,255,255,.03) 0 1px, transparent 1px 3px), radial-gradient(120% 120% at 50% 50%, transparent 55%, rgba(0,0,0,.55)); }
+.md-chip { position: absolute; left: 6px; top: 6px; z-index: 3; display: flex; align-items: center; gap: 4px; height: 15px; padding: 0 6px;
+  border-radius: 8px; font-size: 8px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--text-2);
+  background: rgba(6,9,16,.72); border: 1px solid rgba(255,255,255,.08); backdrop-filter: blur(4px); }
+.md-tile.on .md-chip { color: #fff; border-color: color-mix(in srgb, var(--mc) 60%, transparent); box-shadow: 0 0 10px -2px var(--mc); }
+.md-chip i { width: 5px; height: 5px; border-radius: 50%; background: #ff3b52; box-shadow: 0 0 6px #ff3b52; animation: mdBlink 1.2s ease-in-out infinite; }
+
+.md-body { display: flex; flex-direction: column; gap: 2px; padding: 9px 10px 2px; }
+.md-name { font-size: 12.5px; font-weight: 700; letter-spacing: -.01em; color: var(--text-1); transition: color .3s, text-shadow .3s; }
+.md-tile.on .md-name { color: #fff; text-shadow: 0 0 14px color-mix(in srgb, var(--mc) 70%, transparent); }
+.md-tag { font-size: 8.5px; font-weight: 800; letter-spacing: .15em; text-transform: uppercase; width: max-content;
+  background: linear-gradient(90deg, var(--mc), var(--mc2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.md-desc { margin-top: 3px; font-size: 9.8px; line-height: 1.38; color: var(--text-3); }
+.md-tile.on .md-desc { color: var(--text-2); }
+.md-foot { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px 10px; }
+.md-sw { position: relative; width: 30px; height: 16px; border-radius: 10px; background: #161d2a; border: 1px solid var(--line-3); transition: all .35s var(--ease); }
+.md-sw i { position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 50%; background: #6b7488; transition: all .4s var(--ease-back); }
+.md-tile.on .md-sw { background: linear-gradient(90deg, var(--mc), var(--mc2)); border-color: transparent; box-shadow: 0 0 14px -2px var(--mc); }
+.md-tile.on .md-sw i { left: 16px; background: #fff; box-shadow: 0 0 8px #fff; }
+.md-shine { position: absolute; inset: 0; z-index: 4; pointer-events: none; transform: translateX(-130%);
+  background: linear-gradient(105deg, transparent 32%, rgba(255,255,255,.14) 47%, rgba(255,255,255,.03) 55%, transparent 62%); }
+.md-tile:hover .md-shine { transform: translateX(130%); transition: transform 1s var(--ease); }
+.md-flash { position: absolute; inset: 0; z-index: 5; pointer-events: none; opacity: 0; mix-blend-mode: screen;
+  background: radial-gradient(circle at 82% 88%, #fff 0, var(--mc) 16%, color-mix(in srgb, var(--mc2) 40%, transparent) 38%, transparent 65%); }
+.md-tile.ignite { animation: mdKick .55s var(--ease-back); }
+.md-tile.ignite .md-flash { animation: mdFlash 1s ease-out; }
+/* every tile is a hero: full width, an 86 px miniature, the name block beside the switch */
+.modes-menu button.md-tile.hero { width: 100%; }
+.md-tile.hero .hv { height: 86px; }
+.modes-menu .hv > svg { display: block; width: 100%; height: 86px; }
+.md-tile.hero .hv-low { display: flex; align-items: center; gap: 10px; }
+.md-tile.hero .md-body { flex: 1; min-width: 0; padding: 9px 0 10px 11px; }
+.md-tile.hero .md-name { font-size: 13px; }
+.md-tile.hero .md-foot { padding: 0 11px 0 0; }
+.md-tile.hero.on .md-name { text-shadow: 0 0 16px color-mix(in srgb, var(--mc) 65%, transparent); }
+.md-tile.hero .md-chip i { background: var(--mc); box-shadow: 0 0 6px var(--mc); }
+/* no session to draw on (a daily or longer chart): dim, still showing what it would draw */
+.modes-menu button.md-tile.hero.idle { opacity: .62; }
+.md-tile.hero.idle .hv, .md-tile.hero.idle:hover .hv { filter: saturate(.2) brightness(.6); }
+.md-tile.hero.idle .md-chip { color: var(--text-3); letter-spacing: .1em; }
+/* heatmap / order flow are recorded for NIFTY only: on any other chart the tiles sit dim, grey and still */
+.modes-menu button.md-tile.na { cursor: not-allowed; opacity: .5; }
+.modes-menu button.md-tile.na:hover, .modes-menu button.md-tile.na:active { transform: none; }
+.md-tile.na *, .md-tile.na::before, .md-tile.na::after { animation-play-state: paused !important; }
+.md-tile.na::before { opacity: .3; }
+.md-tile.na::after, .md-tile.na .md-shine { display: none; }
+.md-tile.na .md-viz, .md-tile.na:hover .md-viz { filter: saturate(0) brightness(.55); }
+.md-tile.na .md-chip { color: var(--text-3); letter-spacing: .1em; }
+
+/* golden volume profile: TradingView's black, the profile breathing, today's candles replaying into the zones */
+.md-tile.gold .gv-viz { background: #0f0f0f; }
+.gv-viz .gv-r { transform-box: fill-box; transform-origin: 0 50%; animation: gvRow 3.4s ease-in-out infinite alternate; animation-delay: var(--d); }
+.md-tile.gold.ignite .gv-r { animation: gvGrow .9s cubic-bezier(.2,.9,.3,1) both, gvRow 3.4s ease-in-out .9s infinite alternate; animation-delay: var(--g), var(--d); }
+.gv-viz .gv-z { animation: gvZone 2.8s ease-in-out infinite alternate; }
+.gv-viz .gv-poc { filter: drop-shadow(0 0 2px rgba(245,155,12,.9)); }
+.gv-viz .gv-glint { animation: gvGlint 3.2s cubic-bezier(.45,0,.55,1) infinite; }
+.gv-viz .gv-c { transform-box: fill-box; transform-origin: 50% 100%; opacity: 0; animation: gvCandle 8.4s linear infinite; animation-delay: var(--d); }
+.gv-viz .gv-t { font: 800 6.6px/1 Inter, system-ui, sans-serif; letter-spacing: .05em; text-anchor: end; dominant-baseline: middle; }
+@keyframes gvRow { from { transform: scaleX(.9); } to { transform: scaleX(1); } }
+@keyframes gvGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes gvZone { from { opacity: .62; } to { opacity: 1; } }
+@keyframes gvGlint { from { transform: translateX(-30px); } to { transform: translateX(330px); } }
+@keyframes gvCandle { 0% { opacity: 0; transform: scaleY(.25); } 3% { opacity: 1; transform: none; } 84% { opacity: 1; } 93%, 100% { opacity: 0; } }
+
+/* a replay candle as one HTML element (body and wick are background layers): its pop-in runs on the compositor */
+.hv .hc { position: absolute; display: block; transform-origin: 50% 100%; --c: #089981;
+  background: linear-gradient(var(--c), var(--c)) 0 var(--bt) / 100% var(--bh) no-repeat, linear-gradient(var(--c), var(--c)) 50% 0 / .8px 100% no-repeat; }
+.hv .hc.n { --c: #f23645; }
+
+/* order flow: candles and big trades replaying on the ATAS slate, then the zoom into footprints (12 s loop) */
+.md-tile.flow .fv-viz { background: #121722; }
+.fv-viz .fv-a, .fv-viz .fv-b, .fv-viz .fv-za, .fv-viz .fv-zb { position: absolute; left: 0; top: 0; width: 344px; height: 86px; }
+.fv-viz .fv-a { will-change: opacity; animation: fvA 12s linear infinite; }
+.fv-viz .fv-b { opacity: 0; will-change: opacity; animation: fvB 12s linear infinite; }
+.fv-viz .fv-za, .fv-viz .fv-zb { transform-origin: 0 0; will-change: transform; animation: fvZa 12s linear infinite; }
+.fv-viz .fv-zb { animation-name: fvZb; }
+.modes-menu .fv-viz svg { position: absolute; left: 0; top: 0; display: block; width: 300px; height: 86px; }   /* (a menu button's svg is 16 px by default) */
+.fv-viz .fv-bg { will-change: transform; }          /* a layer of its own: nothing in front of it ever redraws the blurred book */
+.fv-viz .fv-dom { position: absolute; left: 300px; top: 0; width: 44px; height: 86px; background: #121722; border-left: 1px solid rgba(255,255,255,.06); }
+.fv-viz .fv-dg { position: absolute; inset: 0; transform-origin: right; animation: mdDom 1.7s ease-in-out infinite alternate; animation-delay: var(--d); }
+.fv-viz .fv-dom i { position: absolute; right: 0; height: 2.2px; }
+.fv-viz .fv-dom i.a { background: rgba(222,66,92,.92); }
+.fv-viz .fv-dom i.b { background: rgba(52,184,134,.92); }
+.modes-menu .fv-viz .fv-tot { left: 1px; top: auto; bottom: 2px; width: 42px; height: 7px; }
+.fv-viz .fv-c { opacity: 0; animation: fvC 12s linear infinite backwards; animation-delay: var(--d); }
+.fv-viz .fv-p { position: absolute; display: block; height: 9px; box-sizing: border-box; border: .7px solid; border-radius: .6px;
+  font: 700 6px/7.6px Inter, system-ui, sans-serif; color: #eef3ff; text-align: center; white-space: nowrap; letter-spacing: -.02em;
+  opacity: 0; animation: fvP 12s cubic-bezier(.2,.9,.3,1.3) infinite backwards; animation-delay: var(--d); }
+.fv-viz .fv-p.u { background: rgba(36,118,86,.94); border-color: rgba(96,214,160,.75); }
+.fv-viz .fv-p.n { background: rgba(146,36,54,.94); border-color: rgba(240,104,124,.75); }
+.fv-viz .fv-f { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%;
+  background: radial-gradient(circle, #fff 0, #ffe7a8 30%, rgba(255,140,36,.6) 60%, rgba(255,59,38,0) 100%);
+  opacity: 0; animation: fvF 12s ease-out infinite backwards; animation-delay: var(--d); }
+.fv-viz .fv-g { transform-box: view-box; animation: fvG 12s cubic-bezier(.2,.8,.2,1) infinite backwards; animation-delay: var(--d); }
+.fv-viz .fv-poc { opacity: 0; animation: fvO 12s ease-out infinite backwards; animation-delay: var(--d); }
+.fv-viz .fv-d { font: 600 6.6px/1 "JetBrains Mono", ui-monospace, monospace; text-anchor: middle; dominant-baseline: middle; opacity: 0;
+  animation: fvD 12s ease-out infinite backwards; animation-delay: var(--d); }
+.fv-viz .fv-tt { font: 700 5.2px/1 Inter, system-ui, sans-serif; dominant-baseline: middle; }
+.fv-viz .fv-tt.e { text-anchor: end; }
+.md-tile.flow.ignite .fv-dom { transform-origin: 100% 50%; animation: fvIgnite .8s cubic-bezier(.2,.9,.3,1) both; }
+@keyframes fvA { 0%, 46% { opacity: 1; } 53%, 93% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes fvB { 0%, 46% { opacity: 0; } 53%, 88% { opacity: 1; } 93%, 100% { opacity: 0; } }
+@keyframes fvC { 0% { opacity: 0; transform: scaleY(.25); } 1.5% { opacity: 1; transform: none; } 48% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes fvP { 0% { opacity: 0; transform: scale(.3); } 1.2% { opacity: 1; transform: scale(1.22); } 2.4% { transform: none; } 48% { opacity: 1; } 50%, 100% { opacity: 0; } }
+@keyframes fvF { 0% { opacity: 0; transform: scale(.2); } 1.4% { opacity: 1; transform: none; } 7% { opacity: 0; transform: scale(2.6); } 100% { opacity: 0; } }
+@keyframes fvG { 0% { transform: scaleX(0); } 3%, 38% { transform: none; } 39%, 100% { transform: scaleX(0); } }
+@keyframes fvO { 0% { opacity: 0; } 2%, 36% { opacity: 1; } 37%, 100% { opacity: 0; } }
+@keyframes fvD { 0% { opacity: 0; transform: translateY(2px); } 3%, 34% { opacity: 1; transform: none; } 35%, 100% { opacity: 0; } }
+@keyframes fvIgnite { from { transform: scaleX(0); } }
+@keyframes mdDom { from { transform: scaleX(.55); } to { transform: scaleX(1); } }
+
+/* smart money: the structure story replaying on the terminal's navy, each mark with the candle that confirms it */
+.md-tile.smc .sm-viz { background: #090c13; }
+.sm-viz > svg, .sm-viz .sm-cl { position: absolute; left: 0; top: 0; width: 344px; height: 86px; }
+.modes-menu .sm-viz > svg { width: 344px; }      /* exact pixels, like the HTML candles between its layers */
+.sm-viz .sm-bgl { will-change: transform; }      /* the zones that stand still: a layer of their own, drawn once */
+.sm-viz .sm-c { opacity: 0; animation: smC 9.6s linear infinite; animation-delay: var(--d); }
+.sm-viz .sm-l { transform-box: fill-box; transform-origin: 0 50%; opacity: 0; animation: smL 9.6s cubic-bezier(.2,.8,.2,1) infinite; animation-delay: var(--d); }
+.sm-viz .sm-t { opacity: 0; animation: smT 9.6s ease-out infinite; animation-delay: var(--d); }
+.sm-viz .sm-t text { font: 700 5.8px/1 Inter, system-ui, sans-serif; text-anchor: middle; dominant-baseline: middle;
+  paint-order: stroke; stroke: rgba(7,9,14,.9); stroke-width: 1.7px; stroke-linejoin: round; }
+.sm-viz .sm-t text.b { font-weight: 800; font-size: 6.3px; }
+.sm-viz .sm-t text.s { font-size: 5.3px; letter-spacing: .02em; }
+.sm-viz .sm-t text.p, .sm-viz .sm-pt { font: 700 5.4px/1 Inter, system-ui, sans-serif; text-anchor: start; dominant-baseline: middle; stroke: none; }
+.sm-viz .sm-x { transform-box: fill-box; transform-origin: 50% 50%; opacity: 0; animation: smX 9.6s ease-out infinite; animation-delay: var(--d); }
+.sm-viz .sm-p { opacity: 0; animation: smP 9.6s cubic-bezier(.2,.9,.3,1.2) infinite; animation-delay: var(--d); }
+.md-tile.smc.ignite .sm-ol { animation: smIgnite 1s ease-out; }
+@keyframes smC { 0% { opacity: 0; transform: scaleY(.25); } 3% { opacity: 1; transform: none; } 82% { opacity: 1; } 90%, 100% { opacity: 0; } }
+@keyframes smL { 0% { opacity: 0; transform: scaleX(0); } 5% { opacity: 1; transform: none; } 82% { opacity: 1; } 90%, 100% { opacity: 0; } }
+@keyframes smT { 0% { opacity: 0; transform: translateY(1.5px); } 4% { opacity: 1; transform: none; } 82% { opacity: 1; } 90%, 100% { opacity: 0; } }
+@keyframes smX { 0% { opacity: 0; transform: scale(2.4); } 3% { opacity: 1; transform: scale(.85); } 6% { transform: none; } 82% { opacity: 1; } 90%, 100% { opacity: 0; } }
+@keyframes smP { 0% { opacity: 0; transform: translateX(7px); } 5% { opacity: 1; transform: none; } 82% { opacity: 1; } 90%, 100% { opacity: 0; } }
+@keyframes smIgnite { from { filter: brightness(2.2) saturate(1.4); } }
+
+/* liquidity heatmap: Bookmap's glow scrolling by like the live chart, the DOM riding with the price */
+.md-tile.heat .hm-viz { background: #08101c; }
+.hm-viz .hm-heat, .hm-viz .hm-price { position: absolute; left: 0; top: 0; height: 86px; overflow: hidden; }
+.hm-viz .hm-heat { width: 312px; -webkit-mask: linear-gradient(90deg, #000 278px, rgba(0,0,0,.5) 292px, transparent 312px);
+  mask: linear-gradient(90deg, #000 278px, rgba(0,0,0,.5) 292px, transparent 312px); }
+.hm-viz .hm-price { width: 278px; }
+.hm-viz .hm-strip { position: absolute; left: 0; top: 0; width: 624px; height: 86px; will-change: transform; animation: hmScroll 16s linear infinite; }
+.modes-menu .hm-strip svg { display: block; width: 624px; height: 86px; }
+.hm-viz .hm-now { position: absolute; left: 278px; top: 0; bottom: 0; width: 1.2px; background: rgba(176,240,150,.8); box-shadow: 0 0 6px rgba(176,240,150,.45); }
+.hm-viz .hm-dom { position: absolute; left: 312px; right: 0; top: 0; height: 86px; overflow: hidden; }
+.hm-viz .hm-domr { position: absolute; left: 0; top: -86px; width: 32px; height: 172px; animation: hmRide 16s linear infinite; }
+.modes-menu .hm-domr svg { display: block; width: 32px; height: 172px; }
+.hm-viz .hm-m { position: absolute; left: 0; top: 0; width: 32px; height: 172px; transform-origin: 100% 50%; animation: hmBreath 2.2s ease-in-out infinite alternate; }
+.hm-viz .hm-m.b { animation-delay: -1.1s; }
+.hm-viz .hm-ride { position: absolute; left: 278px; top: 0; width: 0; height: 0; z-index: 2; animation: hmRide 16s linear infinite; }
+.hm-viz .hm-ride i { position: absolute; left: -3px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: #fff;
+  box-shadow: 0 0 0 1.5px rgba(54,227,154,.55), 0 0 10px 2px rgba(54,227,154,.8); }
+.hm-viz .hm-ride i::after { content: ""; position: absolute; inset: -5px; border-radius: 50%; border: 1px solid #36e39a; animation: mdPing 1.6s ease-out infinite; }
+.hm-viz .hm-vt { font: 700 5.4px/1 Inter, system-ui, sans-serif; text-anchor: middle; }
+.md-tile.heat.ignite .hm-heat { animation: hmIgnite 1.1s ease-out; }
+@keyframes hmScroll { to { transform: translateX(-312px); } }
+@keyframes hmBreath { from { transform: scaleX(.8); } to { transform: none; } }
+@keyframes hmIgnite { from { filter: brightness(2.4) saturate(1.3); } }
+
+@keyframes mdSpin { to { --md-a: 360deg; } }
+@keyframes mdHue { to { background-position: -200% 0; } }
+@keyframes mdBreath { 0%, 100% { opacity: .3; } 50% { opacity: .62; } }
+@keyframes mdPing { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(1.6); opacity: 0; } }
+@keyframes mdBlink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@keyframes mdKick { 0% { transform: scale(.94); } 55% { transform: scale(1.035); } 100% { transform: none; } }
+@keyframes mdFlash { 0% { opacity: 1; transform: scale(.5); } 100% { opacity: 0; transform: scale(1.7); } }
+/* a still frame for a dim tile (another chart, or reduced motion): the zoomed-out replay, every candle in */
+.md-tile.na .fv-c, .md-tile.na .fv-p { animation: none; opacity: 1; }
+.md-tile.na .fv-a, .md-tile.na .fv-za, .md-tile.na .fv-f { animation: none; }
+/* nothing in the menu moves while it is closed */
+.modes-menu:not(.open) .mm-hh *, .modes-menu:not(.open) .mm-hh *::before, .modes-menu:not(.open) .mm-hh *::after,
+.modes-menu:not(.open) .mm-hs *, .modes-menu:not(.open) .mm-hs *::before, .modes-menu:not(.open) .mm-hs *::after { animation-play-state: paused !important; }
+@media (prefers-reduced-motion: reduce) {
+  .mm-hh *, .mm-hh *::before, .mm-hh *::after, .mm-hs *, .mm-hs *::before, .mm-hs *::after { animation: none !important; transition: none !important; }
+  .gv-viz .gv-c, .fv-viz .fv-c, .fv-viz .fv-p, .sm-viz .sm-c, .sm-viz .sm-l, .sm-viz .sm-t, .sm-viz .sm-x, .sm-viz .sm-p { opacity: 1; }
+}
+.mm-foot { display: flex; gap: 6px; margin-top: 5px; padding-top: 7px; border-top: 1px solid var(--line); }
+/* a menu taller than the window scrolls under the footer, which stays put; a fade says there is more below */
+.mm-hs + .mm-foot { position: sticky; bottom: -6px; z-index: 6; margin: -4px -6px -6px; padding: 7px 6px 6px; border-radius: 0 0 11px 11px;
+  background: rgba(16,21,31,.98); }
+.mm-hs:has(+ .mm-foot) { border-bottom: 0; margin-bottom: 0; }
+.mm-hs + .mm-foot::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 26px; pointer-events: none;
+  background: linear-gradient(rgba(16,21,31,0), rgba(16,21,31,.92)); opacity: 0; transition: opacity .25s; }
+.modes-menu.more .mm-hs + .mm-foot::before { opacity: 1; }
+.mm-foot button { flex: 1; height: 28px; border-radius: 7px; font-size: 11px; font-weight: 600; color: var(--text-2);
+  background: var(--bg-2); border: 1px solid var(--line-2); transition: all .14s; }
+.mm-foot button:hover { color: var(--text-0); background: var(--bg-4); border-color: var(--line-3); }
+#btn-modes.quiet .count { background: var(--bg-4); color: var(--text-3); }
+.modes-menu .mm-foot button.mm-wipe { flex: none; width: auto; height: 28px; margin: 0; padding: 0 10px; gap: 5px; font-size: 11px; font-weight: 600;
+  color: #f0a3ad; background: rgba(242,54,69,.08); border-color: rgba(242,54,69,.25); }
+.modes-menu .mm-foot button.mm-wipe:hover { color: #fff; background: rgba(242,54,69,.28); border-color: rgba(242,54,69,.6); }
+.modes-menu .mm-foot button.mm-wipe svg { width: 12px; height: 12px; }
