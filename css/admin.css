@@ -560,3 +560,34 @@ html[data-theme="light"] .ch .dot { stroke: #ffffff; }
   .ch .ln.draw { stroke-dashoffset: 0; } .ch .ar { opacity: 1; }
   .dn-w circle.seg, .ring circle.v { stroke-dasharray: var(--len) 999; }
 }
+
+/* ── Email & push: pick specific people (js/admin/p-messages.js) ── */
+.ppl { position: relative; margin-bottom: 14px; }
+.ppl-l { display: block; margin-bottom: 7px; font: 700 12px/1 var(--sans); letter-spacing: .02em; color: var(--bone-2); }
+.ppl-in { display: flex; align-items: center; gap: 9px; height: 42px; padding: 0 13px; border-radius: 11px; border: 1px solid var(--line-2); background: rgb(var(--tint) / .03); transition: border-color .2s, box-shadow .2s; }
+.ppl-in:focus-within { border-color: rgb(var(--acc-hi) / .6); box-shadow: 0 0 0 3px rgb(var(--acc) / .12); }
+.ppl-in svg { width: 16px; height: 16px; flex: none; color: var(--ash); }
+.ppl-in input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; color: var(--bone); font: 400 13.5px/1 var(--sans); }
+.ppl-in input::-webkit-search-cancel-button { display: none; }
+.ppl-res { position: absolute; left: 0; right: 0; top: 66px; z-index: 20; padding: 6px; border-radius: 12px; border: 1px solid var(--line); background: rgb(var(--g1) / .98); backdrop-filter: blur(16px); box-shadow: 0 26px 60px -24px rgb(var(--sh) / var(--sh-k)); animation: ppl-in .18s var(--ease); }
+@keyframes ppl-in { from { opacity: 0; transform: translateY(-4px); } }
+.ppl-res button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 9px; border-radius: 9px; text-align: left; transition: background .12s; }
+.ppl-res button:hover, .ppl-res button.on { background: rgb(var(--acc) / .1); }
+.ppl-res button > span:not(.av) { flex: 1; min-width: 0; }
+.ppl-res b { display: block; font: 700 13px/1.25 var(--sans); color: var(--bone); }
+.ppl-res small { display: block; margin-top: 2px; font: 400 11.5px/1.2 var(--font-num); color: var(--ash); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ppl-res em { display: inline-flex; align-items: center; gap: 4px; font: 700 11.5px/1 var(--sans); font-style: normal; color: var(--gold-hi); }
+.ppl-res em svg { width: 12px; height: 12px; }
+.ppl-res button.got em { color: var(--teal, var(--ash)); }
+.ppl-none { padding: 12px 10px; font-size: 12.5px; color: var(--ash); }
+.ppl-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.ppl-chips:empty { display: none; }
+.ppl-chip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 4px 0 4px; border-radius: 999px; border: 1px solid rgb(var(--acc-hi) / .45); background: rgb(var(--acc) / .1); animation: ppl-in .2s var(--ease); }
+.ppl-chip b { font: 700 12.5px/1 var(--sans); color: var(--bone); }
+.ppl-chip small { font: 400 11px/1 var(--font-num); color: var(--ash); }
+.ppl-chip button { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; color: var(--ash); transition: background .12s, color .12s; }
+.ppl-chip button:hover { background: rgb(var(--tint) / .1); color: var(--bone); }
+.ppl-chip button svg { width: 12px; height: 12px; }
+.ppl-or { display: flex; align-items: center; gap: 10px; margin: 2px 0 10px; font: 400 11.5px/1 var(--sans); color: var(--ash); }
+.ppl-or::before, .ppl-or::after { content: ''; flex: 1; height: 1px; background: var(--line-2); }
+html[data-theme="light"] .ppl-res { background: rgb(255 255 255 / .98); box-shadow: 0 26px 50px -26px rgb(20 32 72 / .4), 0 0 0 1px var(--line-2); }

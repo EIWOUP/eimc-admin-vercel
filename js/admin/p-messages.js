@@ -1,5 +1,7 @@
 'use strict';
-/* Email & push: write once, send to one person, a selection or a segment. */
+/* Email & push: write once, send to one person, a selection or a segment.
+   People can be picked here by client ID, name, email or phone, or come
+   pre-selected from the Users page. */
 import { $, $$, api, html, put, raw, icon, num, dtime, ago, avatar, toast, fail, confirmBox, debounce, esc } from './core.js';
 import { dataTable } from './table.js';
 import { sentMsg } from './p-user.js';
@@ -34,7 +36,13 @@ export async function render(root) {
   <div class="compose">
     <form class="card glow lit" id="cmp">
       <div class="card-h"><h2>${icon('users')} Who</h2><div class="r"><span class="st-pill gold" id="aud-n">…</span></div></div>
-      ${picked ? html`<div class="nt" style="margin-bottom:12px">${icon('users')}<span><b>${picked.length} selected</b> on the Users page. <button type="button" class="tlink sm" data-clear-pick>Use a segment instead</button></span></div>` : ''}
+      <div class="ppl" id="ppl">
+        <label class="ppl-l" for="ppl-q">Specific people</label>
+        <div class="ppl-in">${icon('search')}<input id="ppl-q" type="search" autocomplete="off" spellcheck="false" placeholder="Search by client ID, name, email or phone" aria-controls="ppl-res" aria-autocomplete="list"></div>
+        <div class="ppl-res" id="ppl-res" role="listbox" hidden></div>
+        <div class="ppl-chips" id="ppl-chips"></div>
+      </div>
+      <div class="ppl-or"><span>or a whole group</span></div>
       <div class="aud" id="aud">${SEGMENTS.map(([k, l, s]) => html`<button type="button" data-seg="${k}" class="${target === k ? 'on' : ''}"><b>${l}</b>${s ? html`<span>${s}</span>` : ''}</button>`)}</div>
       <div class="mini mt12" id="aud-s"></div>
       <hr class="sep">
@@ -88,12 +96,55 @@ export function mounted(view, ctx) {
     } catch { /* preview is best-effort */ }
   }, 350);
 
+  /* ── specific people: search, pick, remove ── */
+  const people = new Map();                     // user id -> { name, client_id }
+  const q = $('#ppl-q', view), res = $('#ppl-res', view), chips = $('#ppl-chips', view);
+  let hits = [], active = -1;
+  const drawChips = () => {
+    put(chips, html`${[...people].map(([id, p]) => html`<span class="ppl-chip">${avatar(p.name, 'sm')}<b>${p.name}</b><small>${p.client_id}</small><button type="button" data-unpick="${id}" aria-label="Remove ${p.name}">${icon('x')}</button></span>`)}`);
+    $$('[data-unpick]', chips).forEach(b => b.addEventListener('click', () => { people.delete(+b.dataset.unpick); usePeople(); }));
+  };
+  const usePeople = () => {
+    drawChips();
+    if (people.size) { target = { ids: [...people.keys()] }; $$('[data-seg]', view).forEach(x => x.classList.remove('on')); }
+    else if (typeof target !== 'string') { target = 'all'; $('[data-seg="all"]', view).classList.add('on'); }
+    audience();
+  };
+  const closeRes = () => { res.hidden = true; active = -1; };
+  const drawRes = () => {
+    if (!hits.length) { put(res, html`<div class="ppl-none">Nobody matches “${q.value.trim()}”</div>`); res.hidden = false; return; }
+    put(res, html`${hits.map((u, i) => html`<button type="button" role="option" class="${i === active ? 'on' : ''} ${people.has(u.id) ? 'got' : ''}" data-hit="${i}">
+      ${avatar(u.full_name, 'sm')}<span><b>${u.full_name}</b><small>${u.client_id} · ${u.email}</small></span>${people.has(u.id) ? html`<em>Added</em>` : html`<em>${icon('plus')}Add</em>`}</button>`)}`);
+    res.hidden = false;
+    $$('[data-hit]', res).forEach(b => b.addEventListener('mousedown', e => { e.preventDefault(); pick(hits[+b.dataset.hit]); }));
+  };
+  const pick = u => {
+    if (!u) return;
+    people.has(u.id) ? people.delete(u.id) : people.set(u.id, { name: u.full_name, client_id: u.client_id });
+    q.value = ''; closeRes(); q.focus(); usePeople();
+  };
+  const find = debounce(async () => {
+    const s = q.value.trim();
+    if (!s) return closeRes();
+    try { hits = (await api.get('search', { q: s })).users || []; active = hits.length ? 0 : -1; drawRes(); } catch (e) { fail(e); }
+  }, 200);
+  q.addEventListener('input', find);
+  q.addEventListener('keydown', e => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { if (!hits.length) return; e.preventDefault(); active = (active + (e.key === 'ArrowDown' ? 1 : -1) + hits.length) % hits.length; drawRes(); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (!res.hidden) pick(hits[active]); }
+    else if (e.key === 'Escape') closeRes();
+    else if (e.key === 'Backspace' && !q.value && people.size) { people.delete([...people.keys()].pop()); usePeople(); }
+  });
+  q.addEventListener('blur', () => setTimeout(closeRes, 120));
+  q.addEventListener('focus', () => { if (q.value.trim()) find(); });
+  // people pre-selected on the Users page arrive as ids: name them from the audience sample
+  if (picked) api.do('audience', { ids: picked }).then(r => { r.sample.forEach(s => people.set(s.id, { name: s.name, client_id: s.client_id })); drawChips(); }).catch(() => {});
+
   $$('[data-seg]', view).forEach(b => b.addEventListener('click', () => {
-    target = b.dataset.seg; picked = null;
+    target = b.dataset.seg; picked = null; people.clear(); drawChips();
     $$('[data-seg]', view).forEach(x => x.classList.toggle('on', x === b));
     audience();
   }));
-  $('[data-clear-pick]', view)?.addEventListener('click', e => { e.target.closest('.nt').remove(); $('[data-seg="all"]', view).click(); });
   $$('[data-var]', view).forEach(b => b.addEventListener('click', () => {
     const ta = form.body, at = ta.selectionStart ?? ta.value.length, v = `{{${b.dataset.var}}}`;
     ta.value = ta.value.slice(0, at) + v + ta.value.slice(ta.selectionEnd ?? at); ta.focus(); ta.selectionStart = ta.selectionEnd = at + v.length; preview();

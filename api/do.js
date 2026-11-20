@@ -427,7 +427,7 @@ const actions = {
   },
 
   /* ═══════════════════════════════════════════════════════ messaging: email + push */
-  async audience([target]) { const list = await audienceOf(target); return { count: list.length, sample: list.slice(0, 12).map(u => ({ id: u.id, name: u.full_name, email: u.email })) }; },
+  async audience([target]) { const list = await audienceOf(target); return { count: list.length, sample: list.slice(0, 12).map(u => ({ id: u.id, client_id: u.client_id, name: u.full_name, email: u.email })) }; },
 
   async notify([target, m = {}]) {
     const channels = (Array.isArray(m.channels) ? m.channels : [m.channel]).filter(ch => CHANNELS.includes(ch));
