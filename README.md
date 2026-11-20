@@ -28,8 +28,10 @@ uses on port 3000. Edits to `api/*.js` route files are picked up without a resta
 | Overview | MRR, ARR, revenue, growth, sign-ins, usage heatmap (IST), funnel, plan mix, ending-soon, payment trouble, live activity feed |
 | Activity | Every sign-in attempt, live sessions (revoke), the full audit trail, IPs with failures |
 | Users | Search, filter (paying, trial, website sign-ups, at risk, idle…), health score, CSV export, bulk email/push, +30 days, suspend. Customers who created their own account on eimc.vercel.app carry a **Website** tag (`users.signup_source`). |
-| User | Everything the customer sees, editable: client ID, name, email, mobile, member-since date, status, verification, profile and billing/GST details, notification switches, plan, cycle, price, dates, seats, licence key, Dhan client and date, PCs (name, OS, version), sessions, 2-step, orders (item, date, amount, discount, GST, coupon, invoice no.), payment methods (add/edit), messages (read/unread/delete), tickets, timeline. Passwords are bcrypt hashes and cannot be shown; set a new one (typed or generated, visible before saving) instead. |
+| User | Everything the customer sees, editable: client ID, name, email, mobile, member-since date, status, verification, profile and billing/GST details, notification switches, plan, cycle, price, dates, seats, licence key, Dhan client and date, PCs (name, OS, version), sessions, 2-step, orders (item, date, amount, discount, GST, coupon, invoice no.), payment methods (add/edit), messages (read/unread/delete), tickets, timeline. Passwords are bcrypt hashes and cannot be shown; set a new one (typed or generated, visible before saving) instead. **Licence & PCs**: which PCs are signed in to EIMC Terminal, *Sign out PC* (frees its slot; it can sign in again), *Block* (that PC can never use this account again; *Unblock* undoes it), *Sign out all terminals*, a warning when one PC is on several accounts, and the customer's terminal sign-in log. |
 | Subscriptions | Every current plan, MRR by plan, ending soon, one-click +30 days |
+| Releases & access | EIMC Terminal releases (download link, SHA-256, notes, which one is latest), the **minimum version** (raise it to cut old builds off, with a preview of how many PCs it locks out; it can never be newer than the latest release), licence length, **service down** with a reason and message, notices for everyone or one plan (site, terminal or both), versions in use, and the last 100 terminal sign-ins. |
+| Market data | The **go-live switch** for live data (off until Dhan has confirmed in writing), the **house Dhan token** every customer's live data comes from (stored encrypted, shown only as client + expiry, with a countdown), and the relay server's health. |
 | Orders & revenue | Monthly revenue, revenue by plan, refund or mark paid, CSV |
 | Plans & pricing | Monthly price, regular (struck-through) price, PC limit, on-sale switch, feature matrix. eimc.vercel.app reads these live through its `/api/plans`, so the pricing, offer, buy and account pages follow within a minute. Plans sold: Free and Pro, monthly only. |
 | Email & push | Segments or hand-picked users, templates, `{{first_name}}`-style fields, live email and push preview, history |
@@ -54,7 +56,18 @@ Shortcuts: **Ctrl K** or **/** opens search, **R** refreshes.
 1. Create a new Vercel project from this folder (no build step; it is static pages + `/api` functions).
 2. Add environment variables: `DATABASE_URL` (the same pooled Neon URL the live site uses),
    `ADMIN_ID`, `ADMIN_PASSWORD`, `ADMIN_SECRET` (32+ random characters), and the mail keys if you want email.
+   For EIMC Terminal: `EIMC_BROKER_KEY` (32+ random characters; encrypts the house Dhan token, and
+   the relay server needs the **same** value) and, once the relay runs, `RELAY_URL` and `RELAY_ADMIN_TOKEN`.
 3. Deploy. The site sends `noindex` and refuses to be framed.
+
+The terminal pages need the database at `DB/sql/08_licensing.sql`
+(`DB\setup-database.ps1 -Target neon -Migrate 08_licensing.sql`).
+
+## Test the terminal controls
+
+`node tools/test-terminal-admin.mjs` with `DATABASE_URL` pointing at a **local** database whose
+name contains `test` (make one with `DB\setup-database.ps1 -Database eimc_admin_test`). It starts
+its own server with throwaway admin credentials and broker key, and runs 55 checks.
 
 ## Security notes
 

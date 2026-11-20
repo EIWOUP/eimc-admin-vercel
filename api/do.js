@@ -14,6 +14,13 @@ const bool = v => v === true || v === 'true' || v === 1;
 const id = v => { const s = String(v ?? ''); if (!/^\d{1,18}$/.test(s)) throw new UserError('Bad id.'); return s; };
 const pick = (v, list, label) => { if (!list.includes(v)) throw new UserError(`Choose a valid ${label}.`); return v; };
 const date = (v, label) => { if (v == null || v === '') return null; const d = new Date(v); if (isNaN(d)) throw new UserError(`${label} is not a valid date.`); return d.toISOString(); };
+const ver = (v, label = 'The version') => { const s = str(v, 30).replace(/^v/i, ''); if (!/^\d+(\.\d+){1,3}$/.test(s)) throw new UserError(`${label} must look like 1.26.0.0`); return s; };
+const httpsUrl = (v, label) => {
+  const s = nul(v, 500); if (!s) return null;
+  let u; try { u = new URL(s); } catch { throw new UserError(`${label} is not a valid link.`); }
+  if (u.protocol !== 'https:') throw new UserError(`${label} must start with https://`);
+  return s;
+};
 
 const SUB_STATUS = ['trialing', 'active', 'past_due', 'halted', 'cancelled', 'expired'];
 const CYCLES = ['trial', 'monthly'];   // eimc.vercel.app sells monthly only (plus the 1-day Pro trial)
@@ -263,6 +270,12 @@ const actions = {
       await audit(null, uid, `admin.licence.${what}`);
       return { key };
     }
+    if (what === 'signout_all') {         // every terminal must sign in again with the password
+      const r = await q(`UPDATE app_refresh_tokens SET revoked = true WHERE user_id = $1 AND NOT revoked`, [uid]);
+      await q(`INSERT INTO licence_events (user_id, event, reason, details) VALUES ($1, 'signout', 'ADMIN_SIGNOUT_ALL', '{"by":"admin"}')`, [uid]);
+      await audit(null, uid, 'admin.licence.signout_all', { tokens: r.rowCount });
+      return { tokens: r.rowCount };
+    }
     const SQL = {
       revoke: () => [`revoked = true, broker_status = 'expired'`],
       restore: () => [`revoked = false`],
@@ -285,13 +298,33 @@ const actions = {
     await audit(null, uid, `admin.licence.${what}`, v === undefined ? null : { value: v });
   },
 
-  async device([did, what]) {
+  /* revoke  = sign the PC out and free its slot (it can sign in again if a slot is free)
+     restore = give the slot back without a sign-in
+     block   = permanent ban for this PC on this account; unblock lifts it
+     delete  = forget the PC entirely */
+  async device([did, what, reason]) {
     did = id(did);
-    let r;
-    if (what === 'delete') r = await one(`DELETE FROM devices WHERE id = $1 RETURNING user_id, label`, [did]);
-    else r = await one(`UPDATE devices SET revoked = $2 WHERE id = $1 RETURNING user_id, label`, [did, what === 'revoke']);
-    if (!r) throw new UserError('That device was not found.');
-    await audit(null, r.user_id, `admin.device.${what}`, { label: r.label });
+    const SQL = {
+      revoke:  [`revoked = true`],
+      restore: [`revoked = false`],
+      block:   [`blocked = true, blocked_reason = $2`, nul(reason, 200)],
+      unblock: [`blocked = false, blocked_reason = NULL`],
+    };
+    if (what !== 'delete' && !Object.hasOwn(SQL, what)) throw new UserError('Unknown PC change.');
+    const r = await tx(async c => {
+      const row = what === 'delete'
+        ? (await c.query(`DELETE FROM devices WHERE id = $1 RETURNING user_id, label`, [did])).rows[0]
+        : (await c.query(`UPDATE devices SET ${SQL[what][0]} WHERE id = $1 RETURNING user_id, label`,
+            SQL[what].length > 1 ? [did, SQL[what][1]] : [did])).rows[0];
+      if (!row) throw new UserError('That device was not found.');
+      if (what === 'revoke' || what === 'block') {
+        await c.query(`UPDATE app_refresh_tokens SET revoked = true WHERE device_id = $1 AND NOT revoked`, [did]);
+        await c.query(`INSERT INTO licence_events (user_id, device_id, event, reason, details) VALUES ($1, $2, 'signout', $3, '{"by":"admin"}')`,
+          [row.user_id, did, what === 'block' ? 'ADMIN_BLOCK' : 'ADMIN_SIGNOUT']);
+      }
+      return row;
+    });
+    await audit(null, r.user_id, `admin.device.${what}`, { label: r.label, ...(what === 'block' && reason ? { reason: str(reason, 200) } : {}) });
   },
 
   async deviceEdit([did, d = {}]) {
@@ -300,6 +333,138 @@ const actions = {
       [did, nul(d.label, 60), nul(d.os, 60), nul(d.app_version, 40)]);
     if (!r) throw new UserError('That device was not found.');
     await audit(null, r.user_id, 'admin.device.edited', { label: d.label });
+  },
+
+  /* ═══════════════════════════════════════════════════════ terminal: versions, cutoff, status, notices (DB 08) */
+  async policySave([d = {}]) {
+    const min = ver(d.min_supported_version, 'The minimum version');
+    const message = str(d.update_message, 500);
+    if (!message) throw new UserError('Write the message customers see when their version is too old.');
+    const ttl = Math.round(+d.licence_ttl_hours);
+    if (!(ttl >= 1 && ttl <= 168)) throw new UserError('Licence length must be 1 to 168 hours.');
+    // A minimum newer than the latest release would lock everyone out with nothing to update to.
+    const latest = await one(`SELECT version, eimc.version_is_older(version, $1) AS behind FROM app_releases WHERE is_latest AND channel = 'stable'`, [min]);
+    if (latest?.behind) throw new UserError(`The minimum (${min}) is newer than the latest release (${latest.version}). Publish that release first, or customers would have nothing to update to.`);
+    const was = await one(`SELECT min_supported_version, licence_ttl_hours FROM app_policy`);
+    await q(`UPDATE app_policy SET min_supported_version = $1, update_message = $2, licence_ttl_hours = $3, updated_at = now()`, [min, message, ttl]);
+    await audit(null, null, 'admin.policy.saved', { min_supported_version: min, was: was.min_supported_version, licence_ttl_hours: ttl });
+  },
+
+  /* the go-live switch for live market data; only on with Dhan's written OK */
+  async relaySwitch([on, confirmed]) {
+    on = bool(on);
+    if (on && confirmed !== 'DHAN-CONFIRMED') throw new UserError('Tick the box confirming Dhan has approved this in writing first.');
+    await q(`UPDATE app_policy SET relay_enabled = $1, updated_at = now()`, [on]);
+    await audit(null, null, on ? 'admin.relay.enabled' : 'admin.relay.disabled');
+  },
+
+  async serviceSave([d = {}]) {
+    const down = bool(d.is_down);
+    const reason = nul(d.reason, 120), message = nul(d.message, 1000), back = date(d.expected_back_at, 'Expected back');
+    if (down && !reason && !message) throw new UserError('Say why the service is down: customers see this.');
+    await q(`UPDATE service_status SET is_down = $1, reason = $2, message = $3, expected_back_at = $4, updated_at = now()`, [down, reason, message, back]);
+    await audit(null, null, down ? 'admin.service.down' : 'admin.service.up', { reason });
+  },
+
+  async releaseSave([rid, d = {}]) {
+    rid = rid == null || rid === '' ? null : id(rid);
+    const version = ver(d.version);
+    const channel = pick(d.channel || 'stable', ['stable', 'beta'], 'channel');
+    const url = httpsUrl(d.download_url, 'Download link');
+    const sha = nul(d.sha256, 64)?.toLowerCase() ?? null;
+    if (sha && !/^[0-9a-f]{64}$/.test(sha)) throw new UserError('SHA-256 must be 64 hex characters (certutil -hashfile Setup.exe SHA256).');
+    const size = d.size_bytes === '' || d.size_bytes == null ? null : Math.round(+d.size_bytes);
+    if (size != null && !(size > 0)) throw new UserError('Size must be a positive number of bytes.');
+    const notes = nul(d.notes, 4000), at = date(d.released_at, 'Release date');
+    const latest = bool(d.is_latest);
+    const r = await tx(async c => {
+      if (latest) await c.query(`UPDATE app_releases SET is_latest = false WHERE channel = $1 AND is_latest AND id IS DISTINCT FROM $2`, [channel, rid]);
+      const vals = [version, channel, url, sha, size, notes, latest, at];
+      return rid
+        ? (await c.query(`UPDATE app_releases SET version = $2, channel = $3, download_url = $4, sha256 = $5, size_bytes = $6, notes = $7,
+                                 is_latest = $8, released_at = coalesce($9, released_at) WHERE id = $1 RETURNING id`, [rid, ...vals])).rows[0]
+        : (await c.query(`INSERT INTO app_releases (version, channel, download_url, sha256, size_bytes, notes, is_latest, released_at)
+                          VALUES ($1, $2, $3, $4, $5, $6, $7, coalesce($8, now())) RETURNING id`, vals)).rows[0];
+    }).catch(e => { if (e.code === '23505') throw new UserError(`Version ${version} already exists.`); throw e; });
+    if (!r) throw new UserError('That release was not found.');
+    await audit(null, null, rid ? 'admin.release.edited' : 'admin.release.created', { version, channel, latest });
+    return { id: r.id };
+  },
+
+  async releaseDelete([rid]) {
+    rid = id(rid);
+    const r = await one(`SELECT version, is_latest FROM app_releases WHERE id = $1`, [rid]);
+    if (!r) throw new UserError('That release was not found.');
+    if (r.is_latest) throw new UserError('This is the latest release. Mark another one latest first.');
+    await q(`DELETE FROM app_releases WHERE id = $1`, [rid]);
+    await audit(null, null, 'admin.release.deleted', { version: r.version });
+  },
+
+  async noticeSave([nid, d = {}]) {
+    nid = nid == null || nid === '' ? null : id(nid);
+    const title = str(d.title, 120), text = str(d.body, 2000);
+    if (!title || !text) throw new UserError('A notice needs a title and a message.');
+    const level = pick(d.level || 'info', ['info', 'warning', 'critical'], 'level');
+    const shown = pick(d.shown_on || 'both', ['site', 'terminal', 'both'], 'place');
+    const plan = nul(d.plan_code, 40);
+    if (plan && !(await one(`SELECT 1 FROM plans WHERE code = $1`, [plan]))) throw new UserError('Unknown plan.');
+    const starts = date(d.starts_at, 'Starts') || new Date().toISOString(), ends = date(d.ends_at, 'Ends');
+    if (ends && new Date(ends) <= new Date(starts)) throw new UserError('It must end after it starts.');
+    const vals = [title, text, level, shown, plan, starts, ends];
+    const r = nid
+      ? await one(`UPDATE announcements SET title = $2, body = $3, level = $4, shown_on = $5, plan_code = $6, starts_at = $7, ends_at = $8 WHERE id = $1 RETURNING id`, [nid, ...vals])
+      : await one(`INSERT INTO announcements (title, body, level, shown_on, plan_code, starts_at, ends_at) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`, vals);
+    if (!r) throw new UserError('That notice was not found.');
+    await audit(null, null, nid ? 'admin.notice.edited' : 'admin.notice.created', { title, level, shown_on: shown, plan });
+    return { id: r.id };
+  },
+
+  async noticeEnd([nid]) {
+    nid = id(nid);
+    // ends must be after starts (DB check), so a notice that has not started yet, or only just
+    // started, gets its start pulled back a second: "end now" means now.
+    const r = await one(`UPDATE announcements SET ends_at = now(), starts_at = least(starts_at, now() - interval '1 second')
+                          WHERE id = $1 AND (ends_at IS NULL OR ends_at > now()) RETURNING title`, [nid]);
+    if (!r) throw new UserError('That notice has already ended.');
+    await audit(null, null, 'admin.notice.ended', { title: r.title });
+  },
+
+  async noticeDelete([nid]) {
+    nid = id(nid);
+    const r = await one(`DELETE FROM announcements WHERE id = $1 RETURNING title`, [nid]);
+    if (!r) throw new UserError('That notice was not found.');
+    await audit(null, null, 'admin.notice.deleted', { title: r.title });
+  },
+
+  /* ═══════════════════════════════════════════════════════ market data: the house Dhan token */
+  /* Stored encrypted with EIMC_BROKER_KEY (pgcrypto); the relay decrypts it with the same key.
+     The token is never sent back to the browser, only its client id and expiry. */
+  async houseToken([d = {}]) {
+    const key = process.env.EIMC_BROKER_KEY || '';
+    if (key.length < 32) throw new UserError('EIMC_BROKER_KEY is not set on this server (32+ characters). Add it in Vercel, redeploy, then paste the token again.');
+    const token = String(d.token ?? '').trim().replace(/^Bearer\s+/i, '');
+    if (token.length > 4000 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token))
+      throw new UserError('That does not look like a Dhan access token (three parts separated by dots).');
+    let claims;
+    try { claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')); } catch { throw new UserError('That token could not be read.'); }
+    if (claims.iss && claims.iss !== 'dhan') throw new UserError('That token was not issued by Dhan.');
+    const exp = Number(claims.exp);
+    if (!exp) throw new UserError('That token has no expiry, so it is not a Dhan access token.');
+    if (exp * 1000 <= Date.now()) throw new UserError('That token has already expired. Generate a new one on web.dhan.co.');
+    const inToken = claims.dhanClientId ? String(claims.dhanClientId) : null;
+    const clientId = nul(d.client_id, 20) || inToken;
+    if (!clientId || !/^\d{5,20}$/.test(clientId)) throw new UserError('Enter the Dhan client ID (digits).');
+    if (inToken && inToken !== clientId) throw new UserError(`This token belongs to Dhan client ••••${inToken.slice(-4)}, not the one entered.`);
+    await q(`UPDATE house_broker SET client_id = $1, access_token_enc = pgp_sym_encrypt($2, $3), token_expires_at = to_timestamp($4),
+                    updated_at = now(), updated_by = 'admin'`, [clientId, token, key, exp]);
+    const expires = new Date(exp * 1000).toISOString();
+    await audit(null, null, 'admin.house_token.saved', { client: `••••${clientId.slice(-4)}`, expires });
+    return { client_id: clientId, token_expires_at: expires };
+  },
+
+  async houseTokenClear() {
+    await q(`UPDATE house_broker SET access_token_enc = NULL, token_expires_at = NULL, updated_at = now(), updated_by = 'admin'`);
+    await audit(null, null, 'admin.house_token.cleared');
   },
 
   /* add or edit a saved payment method (only what the gateway would show: never a full card number or CVV) */

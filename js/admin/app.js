@@ -13,6 +13,8 @@ const PAGES = {
   users:    { title: 'Users', icon: 'users', load: () => import('./p-users.js'), badge: 'users' },
   user:     { title: 'User', icon: 'user', load: () => import('./p-user.js'), hidden: true, parent: 'users' },
   subs:     { title: 'Subscriptions', icon: 'layers', load: () => import('./p-subs.js'), badge: 'at_risk', hot: true },
+  access:   { title: 'Releases & access', icon: 'shield', load: () => import('./p-access.js') },
+  market:   { title: 'Market data', icon: 'zap', load: () => import('./p-market.js') },
   orders:   { title: 'Orders & revenue', icon: 'receipt', load: () => import('./p-orders.js') },
   plans:    { title: 'Plans & pricing', icon: 'tag', load: () => import('./p-plans.js') },
   messages: { title: 'Email & push', icon: 'send', load: () => import('./p-messages.js') },
@@ -21,7 +23,7 @@ const PAGES = {
   db:       { title: 'Database', icon: 'db', load: () => import('./p-db.js') },
   sql:      { title: 'SQL console', icon: 'code', load: () => import('./p-sql.js') },
 };
-const GROUPS = [['Analyse', ['overview', 'activity']], ['People', ['users', 'subs']], ['Money', ['orders', 'plans']],
+const GROUPS = [['Analyse', ['overview', 'activity']], ['People', ['users', 'subs']], ['Terminal', ['access', 'market']], ['Money', ['orders', 'plans']],
   ['Reach', ['messages']], ['Help', ['support', 'ideas']], ['Data', ['db', 'sql']]];
 
 const view = $('#view');

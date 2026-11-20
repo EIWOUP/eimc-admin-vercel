@@ -5,6 +5,8 @@ import { $, $$, api, html, put, raw, icon, num, inr, ago, date, dtime, dshort, i
 import { barChart } from './charts.js';
 
 let D, uid, tab = 'overview', CTX;
+const LEV = { activate: 'ok', refresh: 'mute', signout: 'mute', denied: 'warn', relay_connect: 'info', relay_drop: 'mute', token_reuse: 'bad' };
+const LEV_LABEL = { activate: 'Signed in', refresh: 'Checked', signout: 'Signed out', denied: 'Refused', relay_connect: 'Live data on', relay_drop: 'Live data off', token_reuse: 'Token reused' };
 const TABS = [['overview', 'Overview'], ['profile', 'Profile'], ['plan', 'Subscription'], ['licence', 'Licence & PCs'], ['security', 'Sign-in & security'],
   ['billing', 'Orders & payments'], ['support', 'Support'], ['messages', 'Messages'], ['activity', 'Timeline']];
 
@@ -93,7 +95,7 @@ const HEAD = {
 
 /* ── tabs ─────────────────────────────────────────────────────────── */
 function tabs(v) {
-  const counts = { billing: D.orders.length, support: D.tickets.length, messages: D.notes.length, licence: D.devices.filter(d => !d.revoked).length, security: D.sessions.filter(s => s.live).length };
+  const counts = { billing: D.orders.length, support: D.tickets.length, messages: D.notes.length, licence: D.devices.filter(d => !d.revoked && !d.blocked).length, security: D.sessions.filter(s => s.live).length };
   put($('#u-tabs', v), html`<span class="ink"></span>${TABS.map(([k, l]) => html`<button type="button" data-t="${k}" class="${tab === k ? 'on' : ''}">${l}${counts[k] ? html` <em>${counts[k]}</em>` : ''}</button>`)}`);
   const ink = () => { const on = $('#u-tabs .on', v), ik = $('#u-tabs .ink', v); if (on && ik) { ik.style.left = on.offsetLeft + 'px'; ik.style.width = on.offsetWidth + 'px'; } };
   requestAnimationFrame(ink);
@@ -122,7 +124,7 @@ const PANES = {
     return html`<div class="g g4">
       <div class="card kpi"><div class="kpi-l">${icon('cash')}Paid in total</div><div class="kpi-v"><span data-count="${D.stats.ltv}" data-fmt="inr">0</span></div><div class="kpi-d"><span>${D.orders.filter(o => o.status === 'paid').length} paid orders · ${inr(D.stats.refunded)} refunded</span></div></div>
       <div class="card kpi"><div class="kpi-l">${icon('check')}Sign-ins, 30 d</div><div class="kpi-v"><span data-count="${D.stats.logins_30}">0</span></div><div class="kpi-d"><span>${num(D.stats.logins)} all-time · ${num(D.stats.fails)} failed</span></div></div>
-      <div class="card kpi"><div class="kpi-l">${icon('monitor')}Terminals</div><div class="kpi-v"><span data-count="${D.devices.filter(d => !d.revoked).length}">0</span><small>/ ${D.licence?.max_devices ?? s?.seats ?? 1}</small></div><div class="kpi-d"><span>${D.sessions.filter(x => x.live).length} live sessions</span></div></div>
+      <div class="card kpi"><div class="kpi-l">${icon('monitor')}Terminals</div><div class="kpi-v"><span data-count="${D.devices.filter(d => !d.revoked && !d.blocked).length}">0</span><small>/ ${D.licence?.max_devices ?? s?.seats ?? 1}</small></div><div class="kpi-d"><span>${D.sessions.filter(x => x.live).length} live sessions</span></div></div>
       <div class="card kpi"><div class="kpi-l">${icon('layers')}Plan</div><div class="kpi-v" style="font-size:1.5rem">${s ? `${s.plan_name} · ${s.billing_cycle}` : 'Free'}</div><div class="kpi-d"><span>${s ? `${inr(s.price)} · since ${date(s.started_at)}` : 'No subscription'}</span></div></div>
     </div>
     <div class="g g21">
@@ -221,13 +223,23 @@ const PANES = {
           <div class="fld wide"><label>Licence key (edit to set your own)</label><input class="mono" value="${l.licence_key}" data-l="key" maxlength="19" style="text-transform:uppercase"></div>
         </div>
         <div class="qa mt20"><button type="button" class="btn" data-lic="regenerate">${icon('refresh')}New key</button>
+          <button type="button" class="btn" data-lic="signout_all" ${D.devices.some(d => d.signed_in) ? '' : 'disabled'}>${icon('out')}Sign out all terminals</button>
           ${l.revoked ? html`<button type="button" class="btn" data-lic="restore">${icon('check')}Restore licence</button>` : html`<button type="button" class="btn btn-danger" data-lic="revoke">${icon('ban')}Revoke licence</button>`}</div>`
         : html`<div class="empty-s">${icon('key')}No licence yet<button type="button" class="btn btn-gold btn-sm" data-lic="issue">Issue a licence</button></div>`}
     </div>
-    ${tblCard(html`<h2>Terminals (PCs)</h2>`, '', ['PC', 'OS', 'Version', 'Last IP', 'First seen', 'Last seen', 'State', ''],
-      D.devices.map(d => html`<tr><td><b style="color:var(--bone)">${d.label || 'PC'}</b></td><td>${d.os || '—'}</td><td class="mono">${d.app_version || '—'}</td><td class="mono">${d.last_ip || '—'}</td>
-        <td class="nw">${date(d.first_seen)}</td><td class="nw">${ago(d.last_seen)}</td><td>${d.revoked ? html`<span class="st-pill mute">Removed</span>` : html`<span class="st-pill ok">Active</span>`}</td>
-        <td class="r nw">${d.revoked ? html`<button type="button" class="btn btn-sm" data-dev="${d.id}" data-w="restore">Restore</button>` : html`<button type="button" class="btn btn-sm" data-dev="${d.id}" data-w="revoke">Sign out PC</button>`} <button type="button" class="btn btn-sm btn-quiet" data-devedit="${d.id}" title="Edit">${icon('edit')}</button> <button type="button" class="btn btn-sm btn-quiet" data-dev="${d.id}" data-w="delete" title="Delete">${icon('trash')}</button></td></tr>`), 'No PCs yet')}`;
+    ${tblCard(html`<h2>Terminals (PCs)</h2>`, '', ['PC', 'OS', 'Version', 'Last IP', 'First seen', 'Last seen', 'Signed in', 'State', ''],
+      D.devices.map(d => html`<tr><td><b style="color:var(--bone)">${d.label || 'PC'}</b>${d.other_accounts ? html`<small><span class="st-pill warn" title="The same PC is registered on other accounts">also on ${d.other_accounts} other account${d.other_accounts === 1 ? '' : 's'}</span></small>` : ''}</td>
+        <td>${d.os || '—'}</td><td class="mono">${d.app_version || '—'}</td><td class="mono">${d.last_ip || '—'}</td>
+        <td class="nw">${date(d.first_seen)}</td><td class="nw">${ago(d.last_seen)}</td><td>${d.signed_in ? html`<span class="st-pill ok">Yes</span>` : html`<span class="st-pill mute">No</span>`}</td>
+        <td>${d.blocked ? html`<span class="st-pill bad" title="${d.blocked_reason || ''}">Blocked</span>` : d.revoked ? html`<span class="st-pill mute">Signed out</span>` : html`<span class="st-pill ok">Active</span>`}</td>
+        <td class="r nw">${d.blocked ? html`<button type="button" class="btn btn-sm" data-dev="${d.id}" data-w="unblock">Unblock</button>`
+          : html`${d.revoked ? html`<button type="button" class="btn btn-sm" data-dev="${d.id}" data-w="restore" title="Give the slot back without a sign-in">Restore</button>` : html`<button type="button" class="btn btn-sm" data-dev="${d.id}" data-w="revoke" title="Signs the PC out and frees its slot">Sign out PC</button>`}
+            <button type="button" class="btn btn-sm btn-danger" data-dev="${d.id}" data-w="block" title="This PC can never use this account again">Block</button>`}
+          <button type="button" class="btn btn-sm btn-quiet" data-devedit="${d.id}" title="Edit">${icon('edit')}</button> <button type="button" class="btn btn-sm btn-quiet" data-dev="${d.id}" data-w="delete" title="Delete">${icon('trash')}</button></td></tr>`), 'No PCs yet')}
+    ${tblCard(html`<h2>Terminal sign-ins</h2><small>sign-ins, checks and refusals from EIMC Terminal</small>`, '', ['When', 'Event', 'Reason', 'PC', 'Version', 'IP'],
+      (D.licenceEvents || []).map(e => html`<tr><td class="nw" title="${dtime(e.at)}">${ago(e.at)}</td><td><span class="st-pill ${LEV[e.event] || 'mute'}">${LEV_LABEL[e.event] || e.event}</span></td>
+        <td class="mono"><small>${e.reason || ''}</small></td><td>${e.pc || '—'}</td><td class="mono">${e.app_version || '—'}</td><td class="mono">${e.ip || '—'}</td></tr>`),
+      'This customer has not used EIMC Terminal yet')}`;
   },
 
   security() {
@@ -331,7 +343,8 @@ const WIRE = {
       const w = b.dataset.lic;
       if (w === 'revoke' && !await confirmBox('Revoke this licence?', 'Their terminal stops accepting the key on its next check.', { label: 'Revoke', danger: true })) return;
       if (w === 'regenerate' && !await confirmBox('Issue a new key?', 'The old key stops working. They need the new one to activate the terminal again.', { label: 'New key' })) return;
-      act(b, () => api.do('licence', uid, w), r => (r?.key ? `New key ${r.key}` : 'Licence updated')).then(reload, () => {});
+      if (w === 'signout_all' && !await confirmBox('Sign out every terminal?', 'Each of their PCs must sign in again with the password. Their PC slots stay theirs.', { label: 'Sign out all', danger: true })) return;
+      act(b, () => api.do('licence', uid, w), r => (r?.key ? `New key ${r.key}` : w === 'signout_all' ? `Signed out (${r?.tokens ?? 0} sign-ins ended)` : 'Licence updated')).then(reload, () => {});
     }));
     $$('[data-l]', p).forEach(i => i.addEventListener('change', () => act(null, () => api.do('licence', uid, i.dataset.l,
       i.dataset.l === 'broker_since' && i.value ? new Date(i.value).toISOString() : i.value), 'Licence updated').then(reload, () => {})));
@@ -345,8 +358,19 @@ const WIRE = {
       if (r) { toast('PC saved'); reload(); }
     }));
     $$('[data-dev]', p).forEach(b => b.addEventListener('click', async () => {
-      if (b.dataset.w === 'delete' && !await confirmBox('Delete this PC?', 'The record is removed; the PC can register again.', { label: 'Delete', danger: true })) return;
-      act(b, () => api.do('device', b.dataset.dev, b.dataset.w), 'PC updated').then(reload, () => {});
+      const w = b.dataset.w;
+      if (w === 'delete' && !await confirmBox('Delete this PC?', 'The record is removed; the PC can register again.', { label: 'Delete', danger: true })) return;
+      let reason;
+      if (w === 'block') {
+        reason = await modal({ title: 'Block this PC?', danger: true,
+          text: 'It is signed out now and can never use this account again, even with the right password. Unblock to undo.',
+          body: html`<div class="form-g"><div class="fld wide"><label>Reason (only admins see it)</label><input name="reason" maxlength="200" placeholder="e.g. key shared with another person"></div></div>`,
+          actions: [{ label: 'Cancel', value: null, cls: 'btn-quiet' }, { label: 'Block PC', submit: true, cls: 'btn-danger' }],
+          submit: f => f.reason || '' });
+        if (reason == null) return;
+      }
+      const msg = { revoke: 'PC signed out', restore: 'PC restored', block: 'PC blocked', unblock: 'PC unblocked', delete: 'PC deleted' }[w] || 'PC updated';
+      act(b, () => api.do('device', b.dataset.dev, w, reason), msg).then(reload, () => {});
     }));
   },
   security(p) {

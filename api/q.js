@@ -164,7 +164,7 @@ async function users() {
 async function user(uid) {
   const u = await one(`SELECT ${USER_COLS} FROM users u WHERE u.id = $1`, [uid]);
   if (!u) throw new UserError('That user does not exist.', 404);
-  const [profile, security, prefs, sub, history, licence, devices, sessions, logins, orders, methods, tickets, notes, feed, ideas, plans, stats] = await Promise.all([
+  const [profile, security, prefs, sub, history, licence, devices, sessions, logins, orders, methods, tickets, notes, feed, ideas, plans, stats, licenceEvents] = await Promise.all([
     one(`SELECT * FROM user_profiles WHERE user_id = $1`, [uid]),
     one(`SELECT two_factor_enabled, two_factor_method, password_changed_at, failed_login_count, locked_until FROM user_security WHERE user_id = $1`, [uid]),
     one(`SELECT * FROM notification_preferences WHERE user_id = $1`, [uid]),
@@ -173,7 +173,10 @@ async function user(uid) {
     many(`SELECT s.*, pl.name AS plan_name FROM subscriptions s JOIN plans pl ON pl.code = s.plan_code
            WHERE s.user_id = $1 ORDER BY s.is_current DESC, s.created_at DESC`, [uid]),
     one(`SELECT * FROM licences WHERE user_id = $1`, [uid]),
-    many(`SELECT id, label, os, app_version, first_seen, last_seen, host(last_ip) AS last_ip, revoked FROM devices WHERE user_id = $1 ORDER BY revoked, last_seen DESC`, [uid]),
+    many(`SELECT d.id, d.label, d.os, d.app_version, d.first_seen, d.last_seen, host(d.last_ip) AS last_ip, d.revoked, d.blocked, d.blocked_reason,
+                 (SELECT count(*) FROM app_refresh_tokens t WHERE t.device_id = d.id AND NOT t.revoked AND t.expires_at > now())::int > 0 AS signed_in,
+                 (SELECT count(*) FROM devices o WHERE o.device_hash = d.device_hash AND o.user_id <> d.user_id)::int AS other_accounts
+            FROM devices d WHERE d.user_id = $1 ORDER BY d.blocked, d.revoked, d.last_seen DESC`, [uid]),
     many(`SELECT id, kind, device_label, host(ip_address) AS ip, user_agent, created_at, last_used_at, expires_at, revoked,
                  (NOT revoked AND expires_at > now()) AS live
             FROM sessions WHERE user_id = $1 ORDER BY live DESC, coalesce(last_used_at, created_at) DESC LIMIT 40`, [uid]),
@@ -200,11 +203,13 @@ async function user(uid) {
                 (SELECT count(*) FROM login_history WHERE user_id = $1 AND success)::int AS logins,
                 (SELECT count(*) FROM login_history WHERE user_id = $1 AND NOT success)::int AS fails,
                 (SELECT count(*) FROM login_history WHERE user_id = $1 AND success AND at > now() - interval '30 days')::int AS logins_30`, [uid]),
+    many(`SELECT e.id, e.event, e.reason, e.app_version, host(e.ip) AS ip, e.at, d.label AS pc
+            FROM licence_events e LEFT JOIN devices d ON d.id = e.device_id WHERE e.user_id = $1 ORDER BY e.at DESC LIMIT 80`, [uid]),
   ]);
   const days = await many(`WITH d AS (SELECT generate_series((now() AT TIME ZONE $2)::date - 29, (now() AT TIME ZONE $2)::date, '1 day')::date AS day)
      SELECT d.day::text AS day, count(h.id)::int AS n FROM d LEFT JOIN login_history h ON h.user_id = $1 AND h.success AND (h.at AT TIME ZONE $2)::date = d.day
       GROUP BY d.day ORDER BY d.day`, [uid, TZ]);
-  return { user: u, profile, security, prefs, sub, history, licence, devices, sessions, logins, orders, methods, tickets, notes, feed, ideas, plans, stats, days };
+  return { user: u, profile, security, prefs, sub, history, licence, devices, sessions, logins, orders, methods, tickets, notes, feed, ideas, plans, stats, days, licenceEvents };
 }
 
 /* ════════════════════════════════════════════════ the other pages */
@@ -341,6 +346,69 @@ async function search(term) {
   return { users, orders: ords, tickets: tks };
 }
 
+/* ════════════════════════════════════════════════ terminal: releases, cutoff, status, notices (DB 08) */
+const ACTIVE_PC = `NOT d.revoked AND NOT d.blocked`;
+async function access() {
+  const [policy, service, releases, notices, versions, events, totals, plans] = await Promise.all([
+    one(`SELECT * FROM app_policy`),
+    one(`SELECT * FROM service_status`),
+    many(`SELECT * FROM app_releases ORDER BY eimc.version_key(version) DESC, released_at DESC`),
+    many(`SELECT a.*, p.name AS plan_name,
+                 CASE WHEN a.starts_at > now() THEN 'scheduled' WHEN a.ends_at IS NOT NULL AND a.ends_at <= now() THEN 'ended' ELSE 'live' END AS state
+            FROM announcements a LEFT JOIN plans p ON p.code = a.plan_code
+           ORDER BY (a.ends_at IS NULL OR a.ends_at > now()) DESC, a.starts_at DESC LIMIT 200`),
+    many(`SELECT * FROM (
+            SELECT coalesce(nullif(regexp_replace(d.app_version, '^[vV]', ''), ''), 'unknown') AS version,
+                   count(*)::int AS pcs, count(DISTINCT d.user_id)::int AS accounts, max(d.last_seen) AS last_seen
+              FROM devices d WHERE ${ACTIVE_PC} GROUP BY 1) v
+           ORDER BY eimc.version_key(v.version) DESC`),
+    many(`SELECT e.id, e.event, e.reason, e.app_version, host(e.ip) AS ip, e.at, e.user_id, u.full_name, u.client_id, d.label AS pc
+            FROM licence_events e LEFT JOIN users u ON u.id = e.user_id LEFT JOIN devices d ON d.id = e.device_id
+           ORDER BY e.at DESC LIMIT 100`),
+    one(`SELECT (SELECT count(*) FROM devices d WHERE ${ACTIVE_PC})::int AS pcs,
+                (SELECT count(*) FROM devices d WHERE d.blocked)::int AS blocked,
+                (SELECT count(DISTINCT t.device_id) FROM app_refresh_tokens t WHERE NOT t.revoked AND t.expires_at > now())::int AS signed_in,
+                (SELECT count(*) FROM licence_events WHERE event = 'denied' AND at > now() - interval '24 hours')::int AS denied_24h,
+                (SELECT count(*) FROM licence_events WHERE event IN ('activate','refresh') AND at > now() - interval '24 hours')::int AS checks_24h`),
+    many(`SELECT code, name FROM plans ORDER BY sort_order`),
+  ]);
+  return { policy, service, releases, notices, versions, events, totals, plans };
+}
+
+/* who a new minimum version would lock out (PCs still in use, on builds older than v) */
+async function cutoff(v) {
+  if (!/^\d+(\.\d+){1,3}$/.test(String(v || ''))) throw new UserError('Use a version like 1.26.0.0');
+  return one(`SELECT count(*)::int AS pcs, count(DISTINCT d.user_id)::int AS accounts,
+                     count(*) FILTER (WHERE d.last_seen > now() - interval '7 days')::int AS recent
+                FROM devices d WHERE ${ACTIVE_PC} AND eimc.version_is_older(coalesce(d.app_version, '0'), $1)`, [v]);
+}
+
+/* the house Dhan account the relay streams from; the token itself is never sent to the browser */
+async function market() {
+  const [broker, policy, relayEvents] = await Promise.all([
+    one(`SELECT broker, client_id, access_token_enc IS NOT NULL AS token_set, token_expires_at, updated_at, updated_by FROM house_broker`),
+    one(`SELECT relay_enabled, updated_at FROM app_policy`),
+    one(`SELECT count(*) FILTER (WHERE event = 'relay_connect')::int AS connects, count(*) FILTER (WHERE event = 'relay_drop')::int AS drops,
+                count(DISTINCT user_id) FILTER (WHERE event = 'relay_connect')::int AS users
+           FROM licence_events WHERE at > now() - interval '24 hours'`),
+  ]);
+  return { broker, policy, relayEvents, keyConfigured: (process.env.EIMC_BROKER_KEY || '').length >= 32, relay: await relayHealth() };
+}
+
+/* GET <RELAY_URL>/health with RELAY_ADMIN_TOKEN; never throws, so the page still loads when the relay is down */
+async function relayHealth() {
+  const url = (process.env.RELAY_URL || '').replace(/\/+$/, '');
+  if (!url) return { configured: false };
+  const t0 = Date.now();
+  try {
+    const r = await fetch(`${url}/health`, { headers: { authorization: `Bearer ${process.env.RELAY_ADMIN_TOKEN || ''}` }, signal: AbortSignal.timeout(3000) });
+    const data = await r.json().catch(() => null);
+    return { configured: true, url, ok: r.ok, status: r.status, ms: Date.now() - t0, data };
+  } catch (e) {
+    return { configured: true, url, ok: false, error: e.name === 'TimeoutError' ? 'No answer within 3 s' : 'Cannot reach the relay' };
+  }
+}
+
 /* ════════════════════════════════════════════════ pulse: the small live numbers in the top bar */
 const pulse = () => one(`SELECT
     (SELECT count(*) FROM sessions WHERE NOT revoked AND expires_at > now() AND last_used_at > now() - interval '15 minutes')::int AS online,
@@ -368,6 +436,9 @@ const VIEWS = {
   table: qs => table(qs),
   search: qs => search(qs.q),
   pulse: () => pulse(),
+  access: () => access(),
+  cutoff: qs => cutoff(qs.version),
+  market: () => market(),
 };
 
 export default guarded(async (req, res) => {
