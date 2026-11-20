@@ -27,7 +27,7 @@ uses on port 3000. Edits to `api/*.js` route files are picked up without a resta
 |---|---|
 | Overview | MRR, ARR, revenue, growth, sign-ins, usage heatmap (IST), funnel, plan mix, ending-soon, payment trouble, live activity feed |
 | Activity | Every sign-in attempt, live sessions (revoke), the full audit trail, IPs with failures |
-| Users | Search, filter (paying, trial, at risk, idle…), health score, CSV export, bulk email/push, +30 days, suspend |
+| Users | Search, filter (paying, trial, website sign-ups, at risk, idle…), health score, CSV export, bulk email/push, +30 days, suspend. Customers who created their own account on eimc.vercel.app carry a **Website** tag (`users.signup_source`). |
 | User | Profile, plan, access dates, licence & PCs, sessions, password, 2-step, orders, refunds, payment methods, tickets, messages, timeline |
 | Subscriptions | Every current plan, MRR by plan, ending soon, one-click +30 days |
 | Orders & revenue | Monthly revenue, revenue by plan, refund or mark paid, CSV |

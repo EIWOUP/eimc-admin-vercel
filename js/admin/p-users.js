@@ -35,6 +35,7 @@ export function mounted(view, ctx) {
       { key: 'access', label: 'With access', test: u => !!u.access_until },
       { key: 'paying', label: 'Paying', test: u => ['active', 'past_due'].includes(u.sub_status) && u.billing_cycle !== 'trial' },
       { key: 'trial', label: 'Trial', test: u => u.sub_status === 'trialing' },
+      { key: 'web', label: 'Website sign-ups', test: u => u.signup_source === 'website' },
       { key: 'risk', label: 'At risk', test: u => ['past_due', 'halted'].includes(u.sub_status) || health(u) < 45 },
       { key: 'churn', label: 'Churned', test: u => ['cancelled', 'expired'].includes(u.sub_status) },
       { key: 'free', label: 'No plan', test: u => !u.sub_status },
@@ -44,7 +45,7 @@ export function mounted(view, ctx) {
     ],
     sort: { col: 0, dir: 'desc' },
     columns: [
-      { label: 'Customer', sort: u => u.client_id, render: u => html`<div class="who">${avatar(u.full_name)}<div><b>${u.full_name}</b><small>${u.client_id} · ${u.email}</small></div></div>` },
+      { label: 'Customer', sort: u => u.client_id, render: u => html`<div class="who">${avatar(u.full_name)}<div><b>${u.full_name}${u.signup_source === 'website' ? html` <span class="st-pill info" title="Created their own account on eimc.vercel.app">Website</span>` : ''}</b><small>${u.client_id} · ${u.email}</small></div></div>` },
       { label: 'Plan', sort: u => u.plan_code || '', render: u => html`${planPill(u.plan_code)} <span class="mini">${u.billing_cycle || ''}</span>` },
       { label: 'Status', sort: u => u.sub_status || '', render: u => html`${subPill(u.sub_status)}${u.status !== 'active' ? html` ${userPill(u.status)}` : ''}${u.cancel_at_period_end ? html` <span class="st-pill warn">Ends</span>` : ''}` },
       { label: 'Access until', sort: u => (u.access_until ? +new Date(u.access_until) : 0), cls: 'nw', render: u => u.access_until ? html`${date(u.access_until)}<small>${daysLeft(u.access_until)} days left</small>` : html`<span class="muted">No access</span>` },
@@ -56,7 +57,7 @@ export function mounted(view, ctx) {
     ],
     onRow: u => ctx.nav(`#/users/${u.id}`),
     csv: 'eimc-users',
-    csvCols: ['client_id', 'full_name', 'email', 'phone', 'status', 'role', 'plan_code', 'billing_cycle', 'sub_status', 'access_until', 'ltv', 'logins_30', 'last_login_at', 'city', 'state', 'created_at'],
+    csvCols: ['client_id', 'full_name', 'email', 'phone', 'signup_source', 'status', 'role', 'plan_code', 'billing_cycle', 'sub_status', 'access_until', 'ltv', 'logins_30', 'last_login_at', 'city', 'state', 'created_at'],
     bulk: [
       { label: 'Email / push', icon: 'send', cls: 'btn-gold', run: rows => { sessionStorage.setItem('admin.msg.ids', JSON.stringify(rows.map(r => r.id))); ctx.nav('#/messages'); } },
       { label: 'Extend +30 d', icon: 'calendar', run: async (rows, b, clear) => {

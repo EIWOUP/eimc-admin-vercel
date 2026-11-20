@@ -114,7 +114,8 @@ async function overview() {
 /* everything that happened, newest first */
 function activityFeed(limit, userId = null) {
   return many(`SELECT * FROM (
-      SELECT 'join' AS kind, u.created_at AS at, u.id AS user_id, u.full_name AS who, u.client_id, 'Joined EIMC' AS what, NULL::text AS extra
+      SELECT 'join' AS kind, u.created_at AS at, u.id AS user_id, u.full_name AS who, u.client_id,
+             CASE u.signup_source WHEN 'website' THEN 'Signed up on the website' ELSE 'Joined EIMC' END AS what, NULL::text AS extra
         FROM users u WHERE u.role = 'customer' AND ($2::bigint IS NULL OR u.id = $2)
       UNION ALL
       SELECT CASE WHEN h.success THEN 'login' ELSE 'fail' END, h.at, h.user_id, coalesce(u.full_name, h.login_id), u.client_id,
@@ -137,7 +138,7 @@ function activityFeed(limit, userId = null) {
 
 /* ════════════════════════════════════════════════ users */
 const USER_COLS = `u.id, u.client_id, u.first_name, u.last_name, u.full_name, u.email, u.phone, u.role, u.status, u.blocked_reason,
-  u.email_verified, u.phone_verified, u.created_at, u.updated_at, u.last_login_at`;
+  u.email_verified, u.phone_verified, u.created_at, u.updated_at, u.last_login_at, u.signup_source, host(u.signup_ip) AS signup_ip`;
 
 async function users() {
   return many(`SELECT ${USER_COLS}, p.city, p.state,

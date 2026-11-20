@@ -46,7 +46,7 @@ function head(v) {
         <span>${icon('user')}Client <button type="button" class="mono" data-copy="${u.client_id}" title="Copy">${u.client_id}</button></span>
         <span>${icon('mail')}<button type="button" data-copy="${u.email}" title="Copy">${u.email}</button>${u.email_verified ? html`<span class="vf">verified</span>` : ''}</span>
         ${u.phone ? html`<span>${icon('phone')}<button type="button" data-copy="${u.phone}">${u.phone}</button></span>` : ''}
-        <span>${icon('calendar')}Joined ${date(u.created_at)}</span>
+        <span>${icon('calendar')}Joined ${date(u.created_at)}${u.signup_source === 'website' ? html` · signed up on the website${u.signup_ip ? ` (${u.signup_ip})` : ''}` : u.signup_source === 'admin' ? ' · added by admin' : ''}</span>
         <span>${icon('clock')}Last sign-in ${ago(u.last_login_at)}</span>
         ${s?.access_until ? html`<span style="color:var(--teal)">${icon('zap')}Access until ${date(s.access_until)} · ${daysLeft(s.access_until)} d</span>` : html`<span style="color:var(--red-t)">${icon('ban')}No access now</span>`}
       </div>
