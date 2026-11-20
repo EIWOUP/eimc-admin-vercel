@@ -101,7 +101,7 @@ export async function newUser(ctx) {
       <div class="fld"><label>City</label><input name="city"></div>
       <div class="fld"><label>State</label><input name="state" value="Gujarat"></div>
       <div class="fld"><label>Plan</label><select name="plan"><option value="none">No plan (free)</option>${plans.map(p => html`<option value="${p.code}">${p.name}</option>`)}</select></div>
-      <div class="fld"><label>Cycle</label><select name="cycle"><option value="trial">Trial</option><option value="monthly" selected>Monthly</option><option value="yearly">Yearly</option></select></div>
+      <div class="fld"><label>Cycle</label><select name="cycle"><option value="trial">Trial</option><option value="monthly" selected>Monthly</option></select></div>
       <div class="fld"><label>Days of access</label><input name="days" type="number" min="1" max="3660" placeholder="30 / 365 / 1"></div>
       <label class="chk" style="align-self:end;padding-bottom:12px"><input type="checkbox" name="email_verified" value="true" checked><span></span>Email verified</label>
     </div>`,

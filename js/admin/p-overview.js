@@ -4,7 +4,7 @@ import { $, api, html, put, raw, icon, num, inr, inrShort, pct, dshort, ago, ava
 import { lineChart, barChart, donut, heatmap, barList, funnel, spark } from './charts.js';
 
 const STATUS_C = { active: 'var(--teal)', trialing: 'var(--cyan)', past_due: 'var(--heat)', halted: 'var(--red)', cancelled: 'var(--ash)', expired: 'var(--dim)' };
-const PLAN = { elite: ['Elite', 'var(--c4)'], pro: ['Pro', 'var(--c1)'], basic: ['Basic', 'var(--c2)'], free: ['Free', 'var(--ash)'], none: ['No plan', 'var(--dim)'] };
+const PLAN = { pro: ['Pro', 'var(--c1)'], free: ['Free', 'var(--ash)'], none: ['No plan', 'var(--dim)'] };
 const FEED_IC = { join: 'user', login: 'check', fail: 'alert', order: 'cash', ticket: 'help', admin: 'shield', audit: 'pulse' };
 
 const delta = (cur, prev) => {
@@ -139,7 +139,7 @@ export function mounted(view, ctx) {
   lineChart(q('#ch-grow'), { labels: d.signups.map(x => x.day), height: 240, xfmt: (s, long) => (long ? new Date(s).toDateString() : dshort(s)),
     series: [{ name: 'Customers', values: d.signups.map(x => x.total), color: 'var(--c1)' }, { name: 'Joined that day', values: d.signups.map(x => x.n), color: 'var(--c2)', area: false, dash: true }] });
 
-  const order = ['elite', 'pro', 'basic', 'free', 'none'];
+  const order = ['pro', 'free', 'none'];
   const plans = order.map(c => ({ code: c, ...(d.plans.find(p => p.k === c) || { n: 0 }) })).filter(p => p.n);
   donut(q('#ch-plan'), { parts: plans.map(p => ({ label: PLAN[p.code]?.[0] || cap(p.code), value: p.n, color: PLAN[p.code]?.[1] || 'var(--ash)' })), sub: 'customers',
     onClick: () => ctx.nav('#/users') });

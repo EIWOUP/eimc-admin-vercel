@@ -9,7 +9,7 @@ export async function render(root) {
   put(root, html`
   <div class="ph"><div><h1>Plans <em>&amp; pricing</em></h1><p>${D.plans.length} plans · ${D.features.length} features</p></div>
     <div class="btns"><button type="button" class="btn btn-sm btn-gold" data-newplan>${icon('plus')}New plan</button></div></div>
-  <div class="nt warn" style="margin-bottom:16px">${icon('info')}<span>Prices here are what the <b>account page, renewals and this admin</b> use. The public pricing page on eimc.vercel.app reads its own <b>js/pricing-data.js</b>, so change both when you change a price.</span></div>
+  <div class="nt" style="margin-bottom:16px">${icon('info')}<span>eimc.vercel.app reads these plans directly: the <b>pricing, offer and buy pages and the account page</b> show what you save here within about a minute. Plans <b>on sale</b> appear on the site. Billing is monthly only; <b>Regular</b> is the struck-through price shown next to a launch price (leave it blank for none).</span></div>
   <div class="g g4">${D.plans.map(p => html`<form class="card lit" data-plan="${p.code}">
     <div class="card-h"><h2>${p.name}</h2><div class="r"><span class="st-pill ${p.is_sellable ? 'ok' : 'mute'}">${p.is_sellable ? 'On sale' : 'Hidden'}</span></div></div>
     <div class="kvs" style="grid-template-columns:repeat(3,1fr);margin-bottom:18px"><div><span>Plans</span><b>${num(p.subscribers)}</b></div><div><span>Access</span><b>${num(p.live)}</b></div><div><span>Revenue</span><b>${inr(p.revenue)}</b></div></div>
@@ -17,7 +17,7 @@ export async function render(root) {
       <div class="fld"><label>Name</label><input name="name" value="${p.name}" required></div>
       <div class="fld"><label>Code</label><input value="${p.code}" readonly></div>
       <div class="fld"><label>₹ / month</label><input name="price_monthly" type="number" min="0" step="1" value="${p.price_monthly}"></div>
-      <div class="fld"><label>₹ / year</label><input name="price_yearly" type="number" min="0" step="1" value="${p.price_yearly}"></div>
+      <div class="fld"><label>Regular ₹ / month</label><input name="list_price" type="number" min="0" step="1" value="${p.list_price ?? ''}" placeholder="none"></div>
       <div class="fld"><label>PCs</label><input name="max_devices" type="number" min="1" max="50" value="${p.max_devices}"></div>
       <div class="fld"><label>Order</label><input name="sort_order" type="number" value="${p.sort_order}"></div>
       <div class="fld wide"><label>Description</label><input name="description" value="${p.description || ''}"></div>
@@ -43,7 +43,7 @@ export function mounted(view, ctx) {
   view.querySelector('[data-newplan]').addEventListener('click', async () => {
     const r = await modal({ title: 'New plan', text: 'It starts hidden (not on sale). Turn it on once it is ready.',
       body: html`<div class="form-g"><div class="fld"><label>Code</label><input name="code" placeholder="e.g. pro_plus" required pattern="[a-z][a-z0-9_]+"></div><div class="fld"><label>Name</label><input name="name" required></div>
-        <div class="fld"><label>₹ / month</label><input name="price_monthly" type="number" min="0" value="0"></div><div class="fld"><label>₹ / year</label><input name="price_yearly" type="number" min="0" value="0"></div>
+        <div class="fld"><label>₹ / month</label><input name="price_monthly" type="number" min="0" value="0"></div><div class="fld"><label>Regular ₹ / month</label><input name="list_price" type="number" min="0" placeholder="none"></div>
         <div class="fld"><label>PCs</label><input name="max_devices" type="number" min="1" value="1"></div><div class="fld"><label>Description</label><input name="description"></div></div>`,
       actions: [{ label: 'Cancel', value: null, cls: 'btn-quiet' }, { label: 'Create plan', submit: true, cls: 'btn-gold' }],
       submit: f => api.do('planCreate', f) });

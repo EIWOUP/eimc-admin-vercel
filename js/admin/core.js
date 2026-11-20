@@ -74,7 +74,7 @@ const ORDP = { paid: 'ok', failed: 'bad', refunded: 'warn', cancelled: 'mute', c
 export const orderPill = s => html`<span class="st-pill ${ORDP[s] || 'mute'}">${cap(s)}</span>`;
 const TKP = { open: 'info', in_progress: 'gold', waiting_customer: 'warn', resolved: 'ok', closed: 'mute' };
 export const ticketPill = s => html`<span class="st-pill ${TKP[s] || 'mute'}">${cap(s)}</span>`;
-export const planPill = p => (p ? html`<span class="st-pill ${p === 'elite' ? 'vio' : p === 'pro' ? 'gold' : p === 'basic' ? 'info' : 'mute'}">${cap(p)}</span>` : html`<span class="st-pill mute">Free</span>`);
+export const planPill = p => (p ? html`<span class="st-pill ${p === 'pro' ? 'gold' : 'mute'}">${cap(p)}</span>` : html`<span class="st-pill mute">Free</span>`);
 
 /* a customer's health, 0..100: access, paying, use, payment trouble, support load */
 export function health(u) {

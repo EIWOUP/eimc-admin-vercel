@@ -189,15 +189,15 @@ const PANES = {
 
     <form class="card lit" id="f-sub"><div class="card-h"><h2>${D.sub ? 'Edit subscription' : 'Give a plan'}</h2><small>changing plan or cycle keeps the old one as history</small></div>
       <div class="form-g">
-        <div class="fld"><label>Plan</label><select name="plan_code">${D.plans.map(p => html`<option value="${p.code}" ${p.code === s.plan_code ? 'selected' : ''}>${p.name} — ${inr(p.price_monthly)}/mo · ${inr(p.price_yearly)}/yr</option>`)}</select></div>
-        <div class="fld"><label>Billing cycle</label><select name="billing_cycle">${opts(['trial', 'monthly', 'yearly'], s.billing_cycle || 'monthly')}</select></div>
+        <div class="fld"><label>Plan</label><select name="plan_code">${D.plans.map(p => html`<option value="${p.code}" ${p.code === s.plan_code ? 'selected' : ''}>${p.name} — ${inr(p.price_monthly)}/mo</option>`)}</select></div>
+        <div class="fld"><label>Billing cycle</label><select name="billing_cycle">${opts(['trial', 'monthly'], s.billing_cycle || 'monthly')}</select></div>
         <div class="fld"><label>Status</label><select name="status">${opts(['active', 'trialing', 'past_due', 'halted', 'cancelled', 'expired'], s.status || 'active')}</select></div>
         <div class="fld"><label>Price (₹, blank = list price)</label><input name="price" type="number" min="0" step="0.01" value="${s.price ?? ''}"></div>
         <div class="fld"><label>Period start</label><input name="current_period_start" type="datetime-local" value="${isoLocal(s.current_period_start || new Date())}"></div>
         <div class="fld"><label>Period end (access until)</label><input name="current_period_end" type="datetime-local" value="${isoLocal(s.current_period_end || new Date(Date.now() + 30 * 864e5))}" required></div>
         <div class="fld"><label>Trial end</label><input name="trial_end" type="datetime-local" value="${isoLocal(s.trial_end)}"></div>
         <div class="fld"><label>Seats / PCs</label><input name="seats" type="number" min="1" max="50" value="${s.seats ?? ''}"></div>
-        <div class="fld"><label>Next cycle</label><select name="next_cycle"><option value="">Same</option>${opts(['monthly', 'yearly'], s.next_cycle)}</select></div>
+        <div class="fld"><label>Next cycle</label><select name="next_cycle"><option value="">Same</option>${opts(['monthly'], s.next_cycle)}</select></div>
         <div class="fld"><label>Cancel reason</label><input name="cancel_reason" value="${s.cancel_reason || ''}"></div>
         <div class="fld"><label>Renewal</label><div style="display:flex;gap:18px;min-height:42px;align-items:center"><label class="chk"><input type="checkbox" name="auto_renew" ${s.auto_renew !== false ? 'checked' : ''}><span></span>Auto-renew</label><label class="chk"><input type="checkbox" name="cancel_at_period_end" ${s.cancel_at_period_end ? 'checked' : ''}><span></span>Ends at period end</label></div></div>
       </div>
@@ -348,7 +348,7 @@ const WIRE = {
         body: html`<div class="form-g">
           <div class="fld"><label>Description</label><input name="description" value="${D.sub ? `${D.sub.plan_name} — ${D.sub.billing_cycle}` : 'Manual order'}" required></div>
           <div class="fld"><label>Plan</label><select name="plan_code"><option value="">—</option>${D.plans.map(p2 => html`<option value="${p2.code}" ${p2.code === D.sub?.plan_code ? 'selected' : ''}>${p2.name}</option>`)}</select></div>
-          <div class="fld"><label>Cycle</label><select name="billing_cycle"><option value="">—</option><option>monthly</option><option>yearly</option></select></div>
+          <div class="fld"><label>Cycle</label><select name="billing_cycle"><option value="">—</option><option>monthly</option></select></div>
           <div class="fld"><label>Amount before GST (₹)</label><input name="amount" type="number" min="0" step="0.01" value="${D.sub?.price ?? 0}" required></div>
           <div class="fld"><label>Discount (₹)</label><input name="discount" type="number" min="0" step="0.01" value="0"></div>
           <div class="fld"><label>Coupon</label><input name="coupon_code"></div>

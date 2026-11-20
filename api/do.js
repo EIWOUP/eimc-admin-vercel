@@ -16,7 +16,7 @@ const pick = (v, list, label) => { if (!list.includes(v)) throw new UserError(`C
 const date = (v, label) => { if (v == null || v === '') return null; const d = new Date(v); if (isNaN(d)) throw new UserError(`${label} is not a valid date.`); return d.toISOString(); };
 
 const SUB_STATUS = ['trialing', 'active', 'past_due', 'halted', 'cancelled', 'expired'];
-const CYCLES = ['trial', 'monthly', 'yearly'];
+const CYCLES = ['trial', 'monthly'];   // eimc.vercel.app sells monthly only (plus the 1-day Pro trial)
 const USER_STATUS = ['active', 'suspended', 'deleted'];
 const ROLES = ['customer', 'admin', 'support'];
 const TICKET_STATUS = ['open', 'in_progress', 'waiting_customer', 'resolved', 'closed'];
@@ -27,10 +27,10 @@ const CHANNELS = ['in_app', 'push', 'email', 'sms', 'whatsapp'];
 const licenceKey = () => 'EIMC-' + Array.from({ length: 3 }, () => crypto.randomBytes(2).toString('hex').toUpperCase()).join('-');
 
 async function planPrice(c, code, cycle) {
-  const r = await c.query(`SELECT price_monthly, price_yearly, max_devices FROM plans WHERE code = $1`, [code]);
+  const r = await c.query(`SELECT price_monthly, max_devices FROM plans WHERE code = $1`, [code]);
   if (!r.rowCount) throw new UserError('Unknown plan.');
   const p = r.rows[0];
-  return { price: cycle === 'yearly' ? p.price_yearly : cycle === 'trial' ? 0 : p.price_monthly, devices: p.max_devices };
+  return { price: cycle === 'trial' ? 0 : p.price_monthly, devices: p.max_devices };
 }
 
 /* ═══════════════════════════════════════════════════════ users */
@@ -156,7 +156,7 @@ const actions = {
       if (plan) {
         const cycle = pick(d.cycle || 'monthly', CYCLES, 'billing cycle');
         const { price, devices } = await planPrice(c, plan, cycle);
-        const days = Math.max(1, Math.min(3660, +d.days || (cycle === 'yearly' ? 365 : cycle === 'trial' ? 1 : 30)));
+        const days = Math.max(1, Math.min(3660, +d.days || (cycle === 'trial' ? 1 : 30)));
         await c.query(`INSERT INTO subscriptions (user_id, plan_code, billing_cycle, status, price, current_period_start, current_period_end, trial_end, seats, auto_renew)
                        VALUES ($1, $2, $3, $4, $5, now(), now() + make_interval(days => $6), CASE WHEN $3 = 'trial' THEN now() + make_interval(days => $6) END, $7, $3 <> 'trial')`,
           [u.id, plan, cycle, cycle === 'trial' ? 'trialing' : 'active', price, days, devices]);
@@ -176,7 +176,7 @@ const actions = {
     const end = date(d.current_period_end, 'Period end');
     const start = date(d.current_period_start, 'Period start');
     const trialEnd = cycle === 'trial' ? (date(d.trial_end, 'Trial end') || end) : null;
-    const nextCycle = d.next_cycle ? pick(d.next_cycle, ['monthly', 'yearly'], 'next cycle') : null;
+    const nextCycle = d.next_cycle ? pick(d.next_cycle, ['monthly'], 'next cycle') : null;
     return tx(async c => {
       const { price: listPrice, devices } = await planPrice(c, plan, cycle);
       const price = d.price === '' || d.price == null ? listPrice : Math.max(0, Number(d.price));
@@ -401,20 +401,22 @@ const actions = {
   async planSave([code, d = {}]) {
     const name = str(d.name, 40);
     if (!name) throw new UserError('The plan needs a name.');
-    const pm = Number(d.price_monthly), py = Number(d.price_yearly), dev = Math.round(+d.max_devices);
-    if (!(pm >= 0) || !(py >= 0)) throw new UserError('Prices must be numbers, 0 or more.');
+    const pm = Number(d.price_monthly), dev = Math.round(+d.max_devices);
+    const lp = d.list_price === '' || d.list_price == null ? null : Number(d.list_price);
+    if (!(pm >= 0) || (lp != null && !(lp >= 0))) throw new UserError('Prices must be numbers, 0 or more.');
+    if (lp != null && lp > 0 && lp <= pm) throw new UserError('The regular price must be higher than the price charged, or left blank.');
     if (!(dev >= 1 && dev <= 50)) throw new UserError('Devices must be 1 to 50.');
-    const r = await q(`UPDATE plans SET name = $2, description = $3, price_monthly = $4, price_yearly = $5, max_devices = $6, is_sellable = $7, sort_order = $8 WHERE code = $1`,
-      [str(code, 20), name, str(d.description, 200), pm, py, dev, bool(d.is_sellable), Math.round(+d.sort_order || 0)]);
+    const r = await q(`UPDATE plans SET name = $2, description = $3, price_monthly = $4, list_price = $5, max_devices = $6, is_sellable = $7, sort_order = $8 WHERE code = $1`,
+      [str(code, 20), name, str(d.description, 200), pm, lp || null, dev, bool(d.is_sellable), Math.round(+d.sort_order || 0)]);
     if (!r.rowCount) throw new UserError('Unknown plan.');
-    await audit(null, null, 'admin.plan.updated', { code, price_monthly: pm, price_yearly: py });
+    await audit(null, null, 'admin.plan.updated', { code, price_monthly: pm, list_price: lp || null });
   },
   async planCreate([d = {}]) {
     const code = str(d.code, 20).toLowerCase();
     if (!/^[a-z][a-z0-9_]{1,19}$/.test(code)) throw new UserError('Code: lowercase letters, digits, underscore.');
-    await q(`INSERT INTO plans (code, name, description, price_monthly, price_yearly, max_devices, is_sellable, sort_order)
+    await q(`INSERT INTO plans (code, name, description, price_monthly, list_price, max_devices, is_sellable, sort_order)
              VALUES ($1, $2, $3, $4, $5, $6, false, (SELECT coalesce(max(sort_order), 0) + 1 FROM plans))`,
-      [code, str(d.name, 40) || code, str(d.description, 200), Math.max(0, +d.price_monthly || 0), Math.max(0, +d.price_yearly || 0), Math.max(1, +d.max_devices || 1)])
+      [code, str(d.name, 40) || code, str(d.description, 200), Math.max(0, +d.price_monthly || 0), +d.list_price > 0 ? +d.list_price : null, Math.max(1, +d.max_devices || 1)])
       .catch(e => { if (e.code === '23505') throw new UserError('A plan with that code already exists.'); throw e; });
     await audit(null, null, 'admin.plan.created', { code });
   },
@@ -525,7 +527,7 @@ const SEGMENTS = {
   expiring: `eimc.access_until(s) BETWEEN now() AND now() + interval '7 days'`,
   no_plan: `(s.id IS NULL OR s.plan_code = 'free')`,
   inactive: `(u.last_login_at IS NULL OR u.last_login_at < now() - interval '14 days')`,
-  plan_basic: `s.plan_code = 'basic'`, plan_pro: `s.plan_code = 'pro'`, plan_elite: `s.plan_code = 'elite'`,
+  plan_pro: `s.plan_code = 'pro'`,
   offers_opt_in: `np.offers`,
 };
 async function audienceOf(target) {

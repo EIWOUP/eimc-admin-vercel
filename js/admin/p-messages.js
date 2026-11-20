@@ -7,8 +7,8 @@ import { sentMsg } from './p-user.js';
 const SEGMENTS = [
   ['all', 'Everyone', 'All active customers'], ['paying', 'Paying', 'Active or past-due paid plans'], ['trialing', 'On trial', 'Trial running now'],
   ['expiring', 'Ending ≤ 7 days', 'Access ends this week'], ['at_risk', 'Payment trouble', 'Past due or halted'], ['churned', 'Churned', 'Cancelled or expired'],
-  ['no_plan', 'No plan', 'Free terminal only'], ['inactive', 'Idle 14 days', 'Have not signed in lately'], ['plan_basic', 'Basic plan', ''], ['plan_pro', 'Pro plan', ''],
-  ['plan_elite', 'Elite plan', ''], ['offers_opt_in', 'Opted into offers', 'OK with marketing'],
+  ['no_plan', 'No plan', 'Free terminal only'], ['inactive', 'Idle 14 days', 'Have not signed in lately'], ['plan_pro', 'Pro plan', ''],
+  ['offers_opt_in', 'Opted into offers', 'OK with marketing'],
 ];
 const TEMPLATES = [
   { k: 'Renewal reminder', t: 'Your EIMC {{plan}} plan renews soon', b: 'Hi {{first_name}},\n\nYour **{{plan}}** plan is active until **{{access_until}}**. Renewal is automatic, so there is nothing for you to do.\n\nIf you want to change your plan or card, open your account.\n\nThe EIMC team' },

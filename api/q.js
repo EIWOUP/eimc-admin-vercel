@@ -19,9 +19,9 @@ async function overview() {
         (SELECT count(*) FROM users WHERE status = 'suspended') AS suspended,
         (SELECT count(*) FROM cur WHERE au IS NOT NULL) AS with_access,
         (SELECT count(*) FROM cur WHERE status IN ('active','past_due') AND billing_cycle <> 'trial' AND plan_code <> 'free') AS paying,
-        (SELECT coalesce(sum(CASE WHEN billing_cycle = 'yearly' THEN price / 12 ELSE price END), 0)
+        (SELECT coalesce(sum(price), 0)
            FROM cur WHERE status IN ('active','past_due') AND billing_cycle <> 'trial') AS mrr,
-        (SELECT coalesce(sum(CASE WHEN billing_cycle = 'yearly' THEN price / 12 ELSE price END), 0)
+        (SELECT coalesce(sum(price), 0)
            FROM cur WHERE status = 'cancelled' AND au IS NOT NULL) AS mrr_leaving,
         (SELECT count(*) FROM cur WHERE status = 'trialing') AS trialing,
         (SELECT count(*) FROM cur WHERE status IN ('past_due','halted')) AS at_risk,
@@ -167,7 +167,7 @@ async function user(uid) {
     one(`SELECT * FROM user_profiles WHERE user_id = $1`, [uid]),
     one(`SELECT two_factor_enabled, two_factor_method, password_changed_at, failed_login_count, locked_until FROM user_security WHERE user_id = $1`, [uid]),
     one(`SELECT * FROM notification_preferences WHERE user_id = $1`, [uid]),
-    one(`SELECT s.*, eimc.access_until(s) AS access_until, pl.name AS plan_name, pl.price_monthly, pl.price_yearly, pl.max_devices
+    one(`SELECT s.*, eimc.access_until(s) AS access_until, pl.name AS plan_name, pl.price_monthly, pl.list_price, pl.max_devices
            FROM subscriptions s JOIN plans pl ON pl.code = s.plan_code WHERE s.user_id = $1 AND s.is_current`, [uid]),
     many(`SELECT s.*, pl.name AS plan_name FROM subscriptions s JOIN plans pl ON pl.code = s.plan_code
            WHERE s.user_id = $1 ORDER BY s.is_current DESC, s.created_at DESC`, [uid]),
@@ -193,7 +193,7 @@ async function user(uid) {
     many(`SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 60`, [uid]),
     activityFeed(60, uid),
     many(`SELECT id, title, status, tag, created_at FROM feature_requests WHERE user_id = $1 ORDER BY created_at DESC`, [uid]),
-    many(`SELECT code, name, price_monthly, price_yearly, max_devices, is_sellable FROM plans ORDER BY sort_order`),
+    many(`SELECT code, name, price_monthly, list_price, max_devices, is_sellable FROM plans ORDER BY sort_order`),
     one(`SELECT (SELECT coalesce(sum(total), 0) FROM orders WHERE user_id = $1 AND status = 'paid') AS ltv,
                 (SELECT coalesce(sum(total), 0) FROM orders WHERE user_id = $1 AND status = 'refunded') AS refunded,
                 (SELECT count(*) FROM login_history WHERE user_id = $1 AND success)::int AS logins,

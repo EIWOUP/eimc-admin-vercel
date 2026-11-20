@@ -5,7 +5,7 @@ import { dataTable } from './table.js';
 import { donut, barList } from './charts.js';
 
 let subs = [], table;
-const mrrOf = s => (['active', 'past_due'].includes(s.status) && s.billing_cycle !== 'trial' ? (s.billing_cycle === 'yearly' ? s.price / 12 : s.price) : 0);
+const mrrOf = s => (['active', 'past_due'].includes(s.status) && s.billing_cycle !== 'trial' ? s.price : 0);
 
 export async function render(root) {
   subs = await api.get('subs');
@@ -15,7 +15,7 @@ export async function render(root) {
   put(root, html`
   <div class="ph"><div><h1>Subscriptions <em>&amp; renewals</em></h1><p>${num(subs.length)} current plans · ${num(live.length)} with access · ${inr(mrr)} MRR · ${num(soon.length)} ending within 7 days</p></div></div>
   <div class="g g4">
-    <div class="card kpi lit"><div class="kpi-l">${icon('trend')}MRR</div><div class="kpi-v"><span data-count="${mrr}" data-fmt="inr">0</span></div><div class="kpi-d"><span>monthly + yearly ÷ 12</span></div></div>
+    <div class="card kpi lit"><div class="kpi-l">${icon('trend')}MRR</div><div class="kpi-v"><span data-count="${mrr}" data-fmt="inr">0</span></div><div class="kpi-d"><span>monthly plans, paying now</span></div></div>
     <div class="card kpi lit"><div class="kpi-l">${icon('zap')}Auto-renewing</div><div class="kpi-v"><span data-count="${subs.filter(s => s.auto_renew && !s.cancel_at_period_end && s.access_until).length}">0</span></div><div class="kpi-d"><span>of ${num(live.length)} with access</span></div></div>
     <div class="card kpi lit" style="--gold-hi:var(--heat-t)"><div class="kpi-l">${icon('clock')}Ending in 7 days</div><div class="kpi-v"><span data-count="${soon.length}">0</span></div><div class="kpi-d"><span>${num(subs.filter(s => s.cancel_at_period_end).length)} set to cancel</span></div></div>
     <div class="card kpi lit" style="--gold-hi:var(--red-t)"><div class="kpi-l">${icon('alert')}Past due / halted</div><div class="kpi-v"><span data-count="${subs.filter(s => ['past_due', 'halted'].includes(s.status)).length}">0</span></div><div class="kpi-d"><span>${inr(subs.filter(s => s.status === 'past_due').reduce((a, s) => a + mrrOf(s), 0))} MRR at stake</span></div></div>
@@ -29,11 +29,11 @@ export async function render(root) {
 
 export function mounted(view, ctx) {
   countUp(view);
-  const cyc = ['monthly', 'yearly', 'trial'].map((c, i) => ({ label: c[0].toUpperCase() + c.slice(1), value: subs.filter(s => s.billing_cycle === c).length, color: ['var(--c1)', 'var(--c2)', 'var(--c3)'][i] }));
+  const cyc = ['monthly', 'trial'].map((c, i) => ({ label: c[0].toUpperCase() + c.slice(1), value: subs.filter(s => s.billing_cycle === c).length, color: ['var(--c1)', 'var(--c2)', 'var(--c3)'][i] }));
   donut(view.querySelector('#s-cyc'), { parts: cyc, sub: 'plans' });
   const byPlan = {};
   subs.forEach(s => { byPlan[s.plan_code] = (byPlan[s.plan_code] || 0) + mrrOf(s); });
-  barList(view.querySelector('#s-mrr'), Object.entries(byPlan).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k[0].toUpperCase() + k.slice(1), value: v, color: k === 'elite' ? 'var(--c4)' : k === 'pro' ? 'var(--c1)' : 'var(--c2)' })), { fmt: v => inr(v) });
+  barList(view.querySelector('#s-mrr'), Object.entries(byPlan).sort((a, b) => b[1] - a[1]).map(([k, v]) => ({ label: k[0].toUpperCase() + k.slice(1), value: v, color: k === 'pro' ? 'var(--c1)' : 'var(--c2)' })), { fmt: v => inr(v) });
 
   table = dataTable(view.querySelector('#st'), {
     rows: subs, key: 'id',

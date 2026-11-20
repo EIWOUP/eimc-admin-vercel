@@ -38,7 +38,7 @@ export function mounted(view, ctx) {
     series: [{ name: 'Paid', values: by('paid'), color: 'var(--c1)' }, { name: 'Refunded', values: by('refunded'), color: 'var(--c3)' }] });
   const plan = {};
   orders.filter(o => o.status === 'paid').forEach(o => { const k = o.plan_code || 'other'; plan[k] = (plan[k] || 0) + o.total; });
-  const PC = { elite: 'var(--c4)', pro: 'var(--c1)', basic: 'var(--c2)', other: 'var(--ash)' };
+  const PC = { pro: 'var(--c1)', free: 'var(--c2)', other: 'var(--ash)' };
   donut(view.querySelector('#o-plan'), { parts: Object.entries(plan).map(([k, v]) => ({ label: cap(k), value: v, color: PC[k] || 'var(--c3)' })), fmt: inrShort, center: inrShort(Object.values(plan).reduce((a, b) => a + b, 0)), sub: 'all-time' });
 
   const STATUS = ['paid', 'failed', 'refunded', 'cancelled', 'created'];
