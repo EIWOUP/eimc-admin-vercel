@@ -72,7 +72,7 @@ const userBody = (u, over) => ({ first_name: u.first_name, last_name: u.last_nam
 const HEAD = {
   msg: () => messageUser(),
   extend: b => act(b, () => api.do('extend', uid, 30), r => `Access now runs to ${date(r.current_period_end)}`).then(reload, () => {}),
-  pw: () => setPassword(),
+  pw: () => { $(`#u-tabs [data-t="security"]`).click(); setTimeout(() => { const i = document.querySelector('#f-pw input[name=password]'); i?.scrollIntoView({ block: 'center', behavior: 'smooth' }); i?.focus(); }, 80); },
   suspend: async b => {
     const r = await modal({ title: `Suspend ${D.user.full_name}?`, danger: true, text: 'They are signed out of the site and the terminal at once, and cannot sign in until you reactivate them.',
       body: html`<div class="fld"><label>Reason (only admins see it)</label><input name="reason" placeholder="e.g. Chargeback, abuse, request"></div>`,
@@ -149,10 +149,11 @@ const PANES = {
     const sw = (name, label, sub, on) => html`<li><div><b>${label}</b><span>${sub}</span></div><label class="sw"><input type="checkbox" name="${name}" ${on ? 'checked' : ''}><i></i></label></li>`;
     return html`<form class="card lit" id="f-user"><div class="card-h"><h2>Account</h2><small>what they sign in with</small></div>
       <div class="form-g">${f('first_name', 'First name', u.first_name)}${f('last_name', 'Last name', u.last_name)}${f('email', 'Email', u.email, 'type="email"')}${f('phone', 'Mobile', u.phone)}
+        ${f('client_id', 'Client ID', u.client_id, 'inputmode="numeric" pattern="\\d{5,12}" class="mono"')}${f('created_at', 'Member since', isoLocal(u.created_at), 'type="datetime-local"')}
         ${sel('status', 'Account status', u.status, ['active', 'suspended', 'deleted'])}${sel('role', 'Role', u.role, ['customer', 'support', 'admin'])}${f('blocked_reason', 'Block reason', u.blocked_reason)}
         <div class="fld"><label>Verified</label><div style="display:flex;gap:18px;min-height:42px;align-items:center"><label class="chk"><input type="checkbox" name="email_verified" ${u.email_verified ? 'checked' : ''}><span></span>Email</label><label class="chk"><input type="checkbox" name="phone_verified" ${u.phone_verified ? 'checked' : ''}><span></span>Mobile</label></div></div>
       </div>
-      <div class="form-f"><span class="mini">Changing the email changes what they sign in with.</span><div class="btns"><button class="btn btn-gold btn-sm" type="submit">Save account</button></div></div></form>
+      <div class="form-f"><span class="mini">Client ID, email and mobile are what they sign in with: changing one changes their login.</span><div class="btns"><button class="btn btn-gold btn-sm" type="submit">Save account</button></div></div></form>
 
     <form class="card lit" id="f-prof"><div class="card-h"><h2>Personal &amp; billing details</h2><small>shown on their account page and GST invoices</small></div>
       <div class="form-g">${f('city', 'City', p.city)}${f('state', 'State', p.state)}${f('pincode', 'PIN code', p.pincode)}${f('country', 'Country', p.country)}
@@ -215,7 +216,9 @@ const PANES = {
           <div class="fld"><label>Max PCs</label><input type="number" min="1" max="50" value="${l.max_devices}" data-l="devices"></div>
           <div class="fld"><label>Dhan connection</label><select data-l="broker">${['connected', 'not connected', 'expired'].map(o => html`<option ${o === l.broker_status ? 'selected' : ''}>${o}</option>`)}</select></div>
           <div class="fld"><label>App version</label><input value="${l.app_version}" data-l="version"></div>
-          <div class="fld"><label>Dhan client</label><input value="${l.broker_client_masked || '—'}" readonly></div>
+          <div class="fld"><label>Dhan client (as they see it)</label><input value="${l.broker_client_masked || ''}" placeholder="e.g. ••••4321" data-l="broker_client"></div>
+          <div class="fld"><label>Dhan connected since</label><input type="datetime-local" value="${isoLocal(l.broker_since)}" data-l="broker_since"></div>
+          <div class="fld wide"><label>Licence key (edit to set your own)</label><input class="mono" value="${l.licence_key}" data-l="key" maxlength="19" style="text-transform:uppercase"></div>
         </div>
         <div class="qa mt20"><button type="button" class="btn" data-lic="regenerate">${icon('refresh')}New key</button>
           ${l.revoked ? html`<button type="button" class="btn" data-lic="restore">${icon('check')}Restore licence</button>` : html`<button type="button" class="btn btn-danger" data-lic="revoke">${icon('ban')}Revoke licence</button>`}</div>`
@@ -224,15 +227,18 @@ const PANES = {
     ${tblCard(html`<h2>Terminals (PCs)</h2>`, '', ['PC', 'OS', 'Version', 'Last IP', 'First seen', 'Last seen', 'State', ''],
       D.devices.map(d => html`<tr><td><b style="color:var(--bone)">${d.label || 'PC'}</b></td><td>${d.os || '—'}</td><td class="mono">${d.app_version || '—'}</td><td class="mono">${d.last_ip || '—'}</td>
         <td class="nw">${date(d.first_seen)}</td><td class="nw">${ago(d.last_seen)}</td><td>${d.revoked ? html`<span class="st-pill mute">Removed</span>` : html`<span class="st-pill ok">Active</span>`}</td>
-        <td class="r nw">${d.revoked ? html`<button type="button" class="btn btn-sm" data-dev="${d.id}" data-w="restore">Restore</button>` : html`<button type="button" class="btn btn-sm" data-dev="${d.id}" data-w="revoke">Sign out PC</button>`} <button type="button" class="btn btn-sm btn-quiet" data-dev="${d.id}" data-w="delete" title="Delete">${icon('trash')}</button></td></tr>`), 'No PCs yet')}`;
+        <td class="r nw">${d.revoked ? html`<button type="button" class="btn btn-sm" data-dev="${d.id}" data-w="restore">Restore</button>` : html`<button type="button" class="btn btn-sm" data-dev="${d.id}" data-w="revoke">Sign out PC</button>`} <button type="button" class="btn btn-sm btn-quiet" data-devedit="${d.id}" title="Edit">${icon('edit')}</button> <button type="button" class="btn btn-sm btn-quiet" data-dev="${d.id}" data-w="delete" title="Delete">${icon('trash')}</button></td></tr>`), 'No PCs yet')}`;
   },
 
   security() {
     const s = D.security || {};
     return html`<div class="g g2">
-      <div class="card lit"><div class="card-h"><h2>${icon('lock')} Password</h2><small>changed ${s.password_changed_at ? ago(s.password_changed_at) : '—'}</small></div>
-        <p class="muted" style="font-size:13.5px">Set a new password for them. It is stored as a bcrypt hash by the database, the same way the site does it.</p>
-        <div class="qa mt20"><button type="button" class="btn btn-gold" data-sec="pw">${icon('key')}Set new password</button><button type="button" class="btn" data-sec="out">${icon('out')}Sign out everywhere</button></div></div>
+      <form class="card lit" id="f-pw"><div class="card-h"><h2>${icon('lock')} Password</h2><small>changed ${s.password_changed_at ? ago(s.password_changed_at) : '—'}</small></div>
+        <div class="nt" style="margin-bottom:14px">${icon('info')}<span>Their current password <b>cannot be shown</b>: it is stored only as a one-way bcrypt hash, so nobody (not even the database) can read it back. Type or generate a new one below. You see it in full before you save it.</span></div>
+        <div class="fld"><label>New password</label><div class="pw-row"><input name="password" type="text" minlength="8" maxlength="128" autocomplete="off" spellcheck="false" class="mono" placeholder="At least 8 characters" required>
+          <button type="button" class="btn btn-sm" data-pw="gen" title="Generate a strong password">${icon('refresh')}Generate</button><button type="button" class="btn btn-sm btn-quiet" data-pw="copy" title="Copy">${icon('copy')}</button></div></div>
+        <label class="chk mt12"><input type="checkbox" name="signout" checked><span></span>Sign them out of every browser and terminal</label>
+        <div class="qa mt20"><button type="submit" class="btn btn-gold">${icon('key')}Set this password</button><button type="button" class="btn" data-sec="out">${icon('out')}Sign out everywhere</button></div></form>
       <div class="card lit"><div class="card-h"><h2>${icon('shield')} Protection</h2></div>
         <div class="kvs"><div><span>2-step sign-in</span><b>${s.two_factor_enabled ? `On · ${s.two_factor_method || 'email'}` : 'Off'}</b></div>
           <div><span>Failed attempts</span><b>${num(s.failed_login_count || 0)}</b></div><div><span>Locked until</span><b>${s.locked_until ? dtime(s.locked_until) : 'Not locked'}</b></div>
@@ -251,16 +257,17 @@ const PANES = {
   billing() {
     const st = ['paid', 'failed', 'refunded', 'cancelled', 'created'];
     return html`${tblCard(html`<h2>Orders &amp; invoices</h2><small>${inr(D.stats.ltv)} paid</small>`, html`<button type="button" class="btn btn-sm btn-gold" data-order>${icon('plus')}Manual order</button>`,
-      ['Order', 'Date', 'Item', '>Total', 'Paid with', 'Invoice', 'Status'],
+      ['Order', 'Date', 'Item', '>Total', 'Paid with', 'Invoice', 'Status', ''],
       D.orders.map(o => html`<tr><td class="mono">${o.order_no}</td><td class="nw">${date(o.created_at)}</td><td>${o.description || cap(o.plan_code)}<small>${o.billing_cycle || ''}${o.coupon_code ? ` · ${o.coupon_code}` : ''}${o.failure_reason ? ` · ${o.failure_reason}` : ''}</small></td>
         <td class="r mono">${inr(o.total, true)}<small>GST ${inr(o.gst_amount, true)}</small></td><td>${o.paid_with || '—'}</td><td class="mono">${o.invoice_no || '—'}</td>
-        <td><select class="mini-sel" data-ost="${o.id}" style="height:30px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--bone);padding:0 8px">${st.map(s => html`<option value="${s}" ${s === o.status ? 'selected' : ''}>${cap(s)}</option>`)}</select></td></tr>`), 'No orders')}
-    ${tblCard(html`<h2>Payment methods</h2><small>only brand, last 4 and expiry are stored</small>`, '', ['Method', 'Details', 'Bank', 'Added', 'State', ''],
+        <td><select class="mini-sel" data-ost="${o.id}" style="height:30px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--bone);padding:0 8px">${st.map(s => html`<option value="${s}" ${s === o.status ? 'selected' : ''}>${cap(s)}</option>`)}</select></td>
+        <td class="r"><button type="button" class="btn btn-sm btn-quiet" data-oedit="${o.id}" title="Edit order">${icon('edit')}</button></td></tr>`), 'No orders')}
+    ${tblCard(html`<h2>Payment methods</h2><small>only brand, last 4 and expiry are stored</small>`, html`<button type="button" class="btn btn-sm" data-pmedit="">${icon('plus')}Add method</button>`, ['Method', 'Details', 'Bank', 'Added', 'State', ''],
       D.methods.map(m => html`<tr style="${m.status === 'removed' ? 'opacity:.5' : ''}"><td><b style="color:var(--bone)">${m.method_type === 'card' ? cap(m.card_brand) : m.method_type === 'upi' ? 'UPI Autopay' : 'Net banking'}</b>${m.is_default ? html` <span class="st-pill gold">Default</span>` : ''}</td>
         <td class="mono">${m.method_type === 'card' ? `•••• ${m.card_last4} · ${String(m.card_exp_month).padStart(2, '0')}/${m.card_exp_year}` : m.upi_vpa_masked || m.bank_name || '—'}</td>
         <td>${m.card_issuer_bank || m.bank_name || '—'}<small>${m.card_funding || ''}</small></td><td class="nw">${date(m.created_at)}</td>
         <td><span class="st-pill ${m.status === 'active' ? 'ok' : m.status === 'expired' ? 'warn' : 'mute'}">${m.status}</span></td>
-        <td class="r nw">${m.status !== 'removed' && !m.is_default ? html`<button type="button" class="btn btn-sm" data-pm="${m.id}" data-w="default">Make default</button>` : ''} ${m.status !== 'removed' ? html`<button type="button" class="btn btn-sm btn-quiet" data-pm="${m.id}" data-w="remove">Remove</button>` : ''}</td></tr>`), 'No saved methods')}`;
+        <td class="r nw">${m.status !== 'removed' && !m.is_default ? html`<button type="button" class="btn btn-sm" data-pm="${m.id}" data-w="default">Make default</button>` : ''} ${m.status !== 'removed' ? html`<button type="button" class="btn btn-sm btn-quiet" data-pm="${m.id}" data-w="remove">Remove</button>` : ''} <button type="button" class="btn btn-sm btn-quiet" data-pmedit="${m.id}" title="Edit">${icon('edit')}</button></td></tr>`), 'No saved methods')}`;
   },
 
   support() {
@@ -269,8 +276,10 @@ const PANES = {
   },
 
   messages() {
-    return tblCard(html`<h2>Messages sent to them</h2>`, html`<button type="button" class="btn btn-sm btn-gold" data-a2="msg">${icon('send')}New message</button>`, ['When', 'Channel', 'Title', 'Read'],
-      D.notes.map(n => html`<tr><td class="nw">${dtime(n.created_at)}</td><td><span class="st-pill ${n.channel === 'email' ? 'info' : n.channel === 'push' ? 'vio' : 'gold'}">${n.channel.replace('_', '-')}</span></td><td><b style="color:var(--bone)">${n.title}</b><small>${(n.body || '').slice(0, 140)}</small></td><td>${n.is_read ? 'Read' : 'Unread'}</td></tr>`), 'Nothing sent yet');
+    return tblCard(html`<h2>Messages sent to them</h2><small>push and in-app ones show in their bell until read</small>`, html`<button type="button" class="btn btn-sm btn-gold" data-a2="msg">${icon('send')}New message</button>`, ['When', 'Channel', 'Title', 'Read', ''],
+      D.notes.map(n => html`<tr><td class="nw">${dtime(n.created_at)}</td><td><span class="st-pill ${n.channel === 'email' ? 'info' : n.channel === 'push' ? 'vio' : 'gold'}">${n.channel.replace('_', '-')}</span></td><td><b style="color:var(--bone)">${n.title}</b><small>${(n.body || '').slice(0, 140)}</small></td>
+        <td>${n.is_read ? 'Read' : html`<span class="st-pill info">Unread</span>`}</td>
+        <td class="r nw"><button type="button" class="btn btn-sm" data-nread="${n.id}" data-on="${n.is_read ? '' : '1'}">${n.is_read ? 'Mark unread' : 'Mark read'}</button> <button type="button" class="btn btn-sm btn-quiet" data-ndel="${n.id}" title="Delete">${icon('trash')}</button></td></tr>`), 'Nothing sent yet');
   },
 
   activity() { return html`<div class="card lit"><div class="card-h"><h2>Everything, newest first</h2></div><div class="feed">${D.feed.map(feed)}</div></div>`; },
@@ -289,7 +298,7 @@ const WIRE = {
     $('[data-go]', p)?.addEventListener('click', () => $(`#u-tabs [data-t="activity"]`).click());
   },
   profile(p) {
-    onSubmit(p, '#f-user', f => api.do('updateUser', uid, f), 'Account saved');
+    onSubmit(p, '#f-user', f => api.do('updateUser', uid, { ...f, created_at: f.created_at ? new Date(f.created_at).toISOString() : null }), 'Account saved');
     onSubmit(p, '#f-prof', f => api.do('updateProfile', uid, f), 'Details saved');
     onSubmit(p, '#f-prefs', f => api.do('updatePrefs', uid, f), 'Switches saved');
   },
@@ -324,14 +333,34 @@ const WIRE = {
       if (w === 'regenerate' && !await confirmBox('Issue a new key?', 'The old key stops working. They need the new one to activate the terminal again.', { label: 'New key' })) return;
       act(b, () => api.do('licence', uid, w), r => (r?.key ? `New key ${r.key}` : 'Licence updated')).then(reload, () => {});
     }));
-    $$('[data-l]', p).forEach(i => i.addEventListener('change', () => act(null, () => api.do('licence', uid, i.dataset.l, i.value), 'Licence updated').then(reload, () => {})));
+    $$('[data-l]', p).forEach(i => i.addEventListener('change', () => act(null, () => api.do('licence', uid, i.dataset.l,
+      i.dataset.l === 'broker_since' && i.value ? new Date(i.value).toISOString() : i.value), 'Licence updated').then(reload, () => {})));
+    $$('[data-devedit]', p).forEach(b => b.addEventListener('click', async () => {
+      const d = D.devices.find(x => String(x.id) === b.dataset.devedit);
+      const r = await modal({ title: 'Edit PC', text: 'What they see under Licence & devices on their account page.',
+        body: html`<div class="form-g"><div class="fld"><label>Name</label><input name="label" value="${d.label || ''}" required></div>
+          <div class="fld"><label>OS</label><input name="os" value="${d.os || ''}"></div><div class="fld"><label>App version</label><input name="app_version" value="${d.app_version || ''}"></div></div>`,
+        actions: [{ label: 'Cancel', value: null, cls: 'btn-quiet' }, { label: 'Save', submit: true, cls: 'btn-gold' }],
+        submit: f => api.do('deviceEdit', d.id, f).then(() => true) });
+      if (r) { toast('PC saved'); reload(); }
+    }));
     $$('[data-dev]', p).forEach(b => b.addEventListener('click', async () => {
       if (b.dataset.w === 'delete' && !await confirmBox('Delete this PC?', 'The record is removed; the PC can register again.', { label: 'Delete', danger: true })) return;
       act(b, () => api.do('device', b.dataset.dev, b.dataset.w), 'PC updated').then(reload, () => {});
     }));
   },
   security(p) {
-    $('[data-sec="pw"]', p).addEventListener('click', setPassword);
+    const pwForm = $('#f-pw', p), pwIn = pwForm.password;
+    const gen = () => { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789', r = crypto.getRandomValues(new Uint32Array(12));
+      pwIn.value = 'EIMC-' + [...r].map(n => A[n % A.length]).join('').replace(/(.{4})(?=.)/g, '$1-'); pwIn.focus(); pwIn.select(); };
+    $('[data-pw="gen"]', p).addEventListener('click', gen);
+    $('[data-pw="copy"]', p).addEventListener('click', () => pwIn.value && copy(pwIn.value, 'Password copied'));
+    pwForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const pw = pwIn.value, out = pwForm.signout.checked;
+      if (pw.length < 8) return toast('Use at least 8 characters', true);
+      try { await act($('[type=submit]', pwForm), () => api.do('setPassword', uid, pw, out), 'Password set'); copy(pw, 'Password set and copied: send it to them'); reload(); } catch { /* toast shown */ }
+    });
     $('[data-sec="out"]', p).addEventListener('click', e => act(e.currentTarget, () => api.do('signOutEverywhere', uid), r => `Signed out of ${r.count} session${r.count === 1 ? '' : 's'}`).then(reload, () => {}));
     $('[data-sec="unlock"]', p).addEventListener('click', e => act(e.currentTarget, () => api.do('unlock', uid), 'Unlocked').then(reload, () => {}));
     $('[data-sec="2fa"]', p).addEventListener('click', e => act(e.currentTarget, () => api.do('setTwoFactor', uid, !D.security?.two_factor_enabled), '2-step sign-in updated').then(reload, () => {}));
@@ -343,6 +372,8 @@ const WIRE = {
       act(null, () => api.do('orderStatus', s.dataset.ost, s.value), 'Order updated').then(reload, () => {});
     }));
     $$('[data-pm]', p).forEach(b => b.addEventListener('click', () => act(b, () => api.do('paymentMethod', b.dataset.pm, b.dataset.w), 'Payment method updated').then(reload, () => {})));
+    $$('[data-pmedit]', p).forEach(b => b.addEventListener('click', () => editMethod(D.methods.find(m => String(m.id) === b.dataset.pmedit))));
+    $$('[data-oedit]', p).forEach(b => b.addEventListener('click', () => editOrder(D.orders.find(o => String(o.id) === b.dataset.oedit))));
     $('[data-order]', p)?.addEventListener('click', async () => {
       const r = await modal({ title: 'Manual order', wide: true, text: 'For an offline payment, a comp or a correction. A paid order gets a GST invoice and counts in revenue.',
         body: html`<div class="form-g">
@@ -359,17 +390,52 @@ const WIRE = {
     });
   },
   support(p) { $$('tr[data-href]', p).forEach(tr => tr.addEventListener('click', () => CTX.nav(tr.dataset.href))); },
-  messages(p) { $('[data-a2="msg"]', p)?.addEventListener('click', messageUser); },
+  messages(p) {
+    $('[data-a2="msg"]', p)?.addEventListener('click', messageUser);
+    $$('[data-nread]', p).forEach(b => b.addEventListener('click', () => act(b, () => api.do('noteRead', b.dataset.nread, !!b.dataset.on), 'Message updated').then(reload, () => {})));
+    $$('[data-ndel]', p).forEach(b => b.addEventListener('click', async () => {
+      if (!await confirmBox('Delete this message?', 'It disappears from their bell and account page.', { label: 'Delete', danger: true })) return;
+      act(b, () => api.do('noteDelete', b.dataset.ndel), 'Message deleted').then(reload, () => {});
+    }));
+  },
 };
 
 /* ── shared dialogs ───────────────────────────────────────────────── */
-async function setPassword() {
-  const r = await modal({ title: `New password for ${D.user.first_name}`, text: 'They will need it on the site and in the terminal. Send it to them yourself, or by email from the Messages tab.',
-    body: html`<div class="fld"><label>Password</label><input name="password" type="text" minlength="8" required value="${'EIMC@' + Math.random().toString(36).slice(2, 8)}"></div>
-      <label class="chk mt12"><input type="checkbox" name="signout" value="1" checked><span></span>Sign them out everywhere</label>`,
-    actions: [{ label: 'Cancel', value: null, cls: 'btn-quiet' }, { label: 'Set password', submit: true, cls: 'btn-gold' }],
-    submit: async f => { await api.do('setPassword', uid, f.password, f.signout === '1'); return f.password; } });
-  if (r) { toast('Password set'); copy(r, 'New password copied'); reload(); }
+async function editOrder(o) {
+  if (!o) return;
+  const r = await modal({ title: `Edit ${o.order_no}`, wide: true, text: 'Everything they see on Orders & invoices. GST and total are worked out from these; the payment and invoice follow.',
+    body: html`<div class="form-g">
+      <div class="fld wide"><label>Item / description</label><input name="description" value="${o.description || ''}" required></div>
+      <div class="fld"><label>Date</label><input name="created_at" type="datetime-local" value="${isoLocal(o.created_at)}" required></div>
+      <div class="fld"><label>Invoice number</label><input name="invoice_no" class="mono" value="${o.invoice_no || ''}" ${o.invoice_no ? '' : 'disabled placeholder="no invoice (unpaid)"'}></div>
+      <div class="fld"><label>Amount before GST (₹)</label><input name="amount" type="number" min="0" step="0.01" value="${o.amount}" required></div>
+      <div class="fld"><label>Discount (₹)</label><input name="discount" type="number" min="0" step="0.01" value="${o.discount || 0}"></div>
+      <div class="fld"><label>GST rate (%)</label><input name="gst_rate" type="number" min="0" max="50" step="0.01" value="${o.gst_rate ?? 18}"></div>
+      <div class="fld"><label>Coupon</label><input name="coupon_code" value="${o.coupon_code || ''}"></div></div>`,
+    actions: [{ label: 'Cancel', value: null, cls: 'btn-quiet' }, { label: 'Save order', submit: true, cls: 'btn-gold' }],
+    submit: f => api.do('orderEdit', o.id, { ...f, created_at: f.created_at ? new Date(f.created_at).toISOString() : null }) });
+  if (r) { toast(`${r.order_no} saved · ${inr(r.total, true)}`); reload(); }
+}
+
+async function editMethod(m) {
+  const x = m || { method_type: 'card', status: 'active' };
+  const opt = (list, v) => list.map(o => html`<option value="${o}" ${o === v ? 'selected' : ''}>${cap(o)}</option>`);
+  const r = await modal({ title: m ? 'Edit payment method' : 'Add payment method', wide: true,
+    text: 'For records only: what their account page shows. Never enter a full card number or CVV.',
+    body: html`<div class="form-g">
+      <div class="fld"><label>Type</label><select name="method_type">${opt(['card', 'upi', 'netbanking'], x.method_type)}</select></div>
+      <div class="fld"><label>State</label><select name="status">${opt(['active', 'expired', 'removed'], x.status)}</select></div>
+      <div class="fld"><label>Card brand</label><select name="card_brand">${opt(['visa', 'mastercard', 'rupay', 'amex', 'diners'], x.card_brand)}</select></div>
+      <div class="fld"><label>Last 4 digits</label><input name="card_last4" class="mono" maxlength="4" inputmode="numeric" value="${x.card_last4 || ''}"></div>
+      <div class="fld"><label>Expiry month</label><input name="card_exp_month" type="number" min="1" max="12" value="${x.card_exp_month || ''}"></div>
+      <div class="fld"><label>Expiry year</label><input name="card_exp_year" type="number" min="2000" max="2100" value="${x.card_exp_year || ''}"></div>
+      <div class="fld"><label>Name on card</label><input name="card_holder_name" value="${x.card_holder_name || ''}"></div>
+      <div class="fld"><label>Card type</label><select name="card_funding"><option value="">—</option>${opt(['credit', 'debit', 'prepaid'], x.card_funding)}</select></div>
+      <div class="fld"><label>Bank</label><input name="card_issuer_bank" value="${x.card_issuer_bank || x.bank_name || ''}"></div>
+      <div class="fld"><label>UPI ID (masked)</label><input name="upi_vpa_masked" value="${x.upi_vpa_masked || ''}" placeholder="ab****@okhdfc"></div></div>`,
+    actions: [{ label: 'Cancel', value: null, cls: 'btn-quiet' }, { label: m ? 'Save' : 'Add method', submit: true, cls: 'btn-gold' }],
+    submit: f => api.do('paymentMethodSave', uid, m ? m.id : null, { ...f, bank_name: f.card_issuer_bank }) });
+  if (r) { toast(m ? 'Payment method saved' : 'Payment method added'); reload(); }
 }
 
 export async function messageUser() {

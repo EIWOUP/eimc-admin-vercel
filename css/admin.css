@@ -591,3 +591,8 @@ html[data-theme="light"] .ch .dot { stroke: #ffffff; }
 .ppl-or { display: flex; align-items: center; gap: 10px; margin: 2px 0 10px; font: 400 11.5px/1 var(--sans); color: var(--ash); }
 .ppl-or::before, .ppl-or::after { content: ''; flex: 1; height: 1px; background: var(--line-2); }
 html[data-theme="light"] .ppl-res { background: rgb(255 255 255 / .98); box-shadow: 0 26px 50px -26px rgb(20 32 72 / .4), 0 0 0 1px var(--line-2); }
+
+/* user page: password row (js/admin/p-user.js) */
+.pw-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pw-row input { flex: 1 1 220px; min-width: 0; letter-spacing: .04em; }
+.pw-row .btn { flex: none; height: 42px; }

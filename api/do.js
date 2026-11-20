@@ -44,14 +44,18 @@ const actions = {
     if (phoneRaw && !/^\+?\d{10,15}$/.test(phoneRaw)) throw new UserError('Enter a valid mobile number.');
     const phone = phoneRaw ? (phoneRaw.startsWith('+') ? phoneRaw : `+91${phoneRaw.slice(-10)}`) : null;
     const status = pick(d.status, USER_STATUS, 'status'), role = pick(d.role, ROLES, 'role');
+    const clientId = d.client_id == null || d.client_id === '' ? null : String(d.client_id).trim();
+    if (clientId != null && !/^\d{5,12}$/.test(clientId)) throw new UserError('Client ID must be 5 to 12 digits.');
+    const joined = d.created_at ? date(d.created_at, 'Joined date') : null;
     await tx(async c => {
       await c.query(`UPDATE users SET first_name = $2, last_name = $3, email = $4, phone = $5, status = $6, role = $7,
-                       blocked_reason = $8, email_verified = $9, phone_verified = $10 WHERE id = $1`,
-        [uid, first, last, email, phone, status, role, nul(d.blocked_reason, 300), bool(d.email_verified), bool(d.phone_verified)]);
+                       blocked_reason = $8, email_verified = $9, phone_verified = $10,
+                       client_id = coalesce($11::bigint, client_id), created_at = coalesce($12::timestamptz, created_at) WHERE id = $1`,
+        [uid, first, last, email, phone, status, role, nul(d.blocked_reason, 300), bool(d.email_verified), bool(d.phone_verified), clientId, joined]);
       // a suspended or deleted account is signed out everywhere at once
       if (status !== 'active') await c.query(`UPDATE sessions SET revoked = true WHERE user_id = $1 AND NOT revoked`, [uid]);
       await audit(c, uid, 'admin.user.updated', { status, role, email });
-    }).catch(e => { if (e.code === '23505') throw new UserError('That email or mobile number already belongs to another account.'); throw e; });
+    }).catch(e => { if (e.code === '23505') throw new UserError('That client ID, email or mobile number already belongs to another account.'); throw e; });
   },
 
   async updateProfile([uid, d = {}]) {
@@ -265,10 +269,18 @@ const actions = {
       devices: () => [`max_devices = $2`, Math.max(1, Math.min(50, +value || 1))],
       broker: () => [`broker_status = $2`, pick(value, ['connected', 'not connected', 'expired'], 'broker status')],
       version: () => [`app_version = $2`, str(value, 40) || 'v1.25.218.93'],
+      key: () => {
+        const k = str(value, 40).toUpperCase();
+        if (!/^EIMC-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(k)) throw new UserError('Use the form EIMC-XXXX-XXXX-XXXX (letters and digits).');
+        return [`licence_key = $2, last_issued_at = now()`, k];
+      },
+      broker_client: () => [`broker_client_masked = $2`, nul(value, 40)],
+      broker_since: () => [`broker_since = $2`, date(value, 'Connected since')],
     };
     if (!Object.hasOwn(SQL, what)) throw new UserError('Unknown licence change.');
     const [set, v] = SQL[what]();
-    const r = await q(`UPDATE licences SET ${set} WHERE user_id = $1`, v === undefined ? [uid] : [uid, v]);
+    const r = await q(`UPDATE licences SET ${set} WHERE user_id = $1`, v === undefined ? [uid] : [uid, v])
+      .catch(e => { if (e.code === '23505') throw new UserError('Another account already has that licence key.'); throw e; });
     if (!r.rowCount) throw new UserError('This user has no licence yet. Issue one first.');
     await audit(null, uid, `admin.licence.${what}`, v === undefined ? null : { value: v });
   },
@@ -280,6 +292,49 @@ const actions = {
     else r = await one(`UPDATE devices SET revoked = $2 WHERE id = $1 RETURNING user_id, label`, [did, what === 'revoke']);
     if (!r) throw new UserError('That device was not found.');
     await audit(null, r.user_id, `admin.device.${what}`, { label: r.label });
+  },
+
+  async deviceEdit([did, d = {}]) {
+    did = id(did);
+    const r = await one(`UPDATE devices SET label = $2, os = $3, app_version = $4 WHERE id = $1 RETURNING user_id`,
+      [did, nul(d.label, 60), nul(d.os, 60), nul(d.app_version, 40)]);
+    if (!r) throw new UserError('That device was not found.');
+    await audit(null, r.user_id, 'admin.device.edited', { label: d.label });
+  },
+
+  /* add or edit a saved payment method (only what the gateway would show: never a full card number or CVV) */
+  async paymentMethodSave([uid, pid, d = {}]) {
+    uid = id(uid);
+    const type = pick(d.method_type || 'card', ['card', 'upi', 'netbanking'], 'method type');
+    const card = type === 'card';
+    const last4 = card ? String(d.card_last4 || '').trim() : null;
+    if (card && !/^\d{4}$/.test(last4)) throw new UserError('Last 4 digits: exactly 4 numbers.');
+    const mm = card ? Math.round(+d.card_exp_month) : null, yy = card ? Math.round(+d.card_exp_year) : null;
+    if (card && !(mm >= 1 && mm <= 12)) throw new UserError('Expiry month must be 1 to 12.');
+    if (card && !(yy >= 2000 && yy <= 2100)) throw new UserError('Expiry year looks wrong.');
+    const brand = card ? pick(d.card_brand || 'visa', ['visa', 'mastercard', 'rupay', 'amex', 'diners'], 'card brand') : null;
+    const funding = card && d.card_funding ? pick(d.card_funding, ['credit', 'debit', 'prepaid'], 'card type') : null;
+    const status = pick(d.status || 'active', ['active', 'expired', 'removed'], 'status');
+    const vals = [type, brand, last4, mm, yy, card ? nul(d.card_holder_name, 80) : null, card ? nul(d.card_issuer_bank, 80) : nul(d.bank_name, 80),
+      funding, type === 'upi' ? nul(d.upi_vpa_masked, 80) : null, status];
+    return tx(async c => {
+      let row;
+      if (pid) {
+        row = (await c.query(`UPDATE payment_methods SET method_type = $3, card_brand = $4, card_last4 = $5, card_exp_month = $6, card_exp_year = $7,
+                                card_holder_name = $8, card_issuer_bank = CASE WHEN $3 = 'card' THEN $9 END, bank_name = CASE WHEN $3 <> 'card' THEN $9 END,
+                                card_funding = $10, upi_vpa_masked = $11, status = $12, is_default = is_default AND $12 = 'active'
+                              WHERE id = $1 AND user_id = $2 RETURNING id`, [id(pid), uid, ...vals])).rows[0];
+        if (!row) throw new UserError('That payment method was not found.');
+      } else {
+        row = (await c.query(`INSERT INTO payment_methods (user_id, method_type, card_brand, card_last4, card_exp_month, card_exp_year, card_holder_name,
+                                card_issuer_bank, bank_name, card_funding, upi_vpa_masked, status, provider, is_default)
+                              VALUES ($1, $2, $3, $4, $5, $6, $7, CASE WHEN $2 = 'card' THEN $8 END, CASE WHEN $2 <> 'card' THEN $8 END, $9, $10, $11, 'manual',
+                                NOT EXISTS (SELECT 1 FROM payment_methods WHERE user_id = $1 AND is_default AND status = 'active') AND $11 = 'active')
+                              RETURNING id`, [uid, ...vals])).rows[0];
+      }
+      await audit(c, uid, pid ? 'admin.payment_method.edited' : 'admin.payment_method.added', { type, last4 });
+      return row;
+    });
   },
 
   async paymentMethod([pid, what]) {
@@ -311,6 +366,31 @@ const actions = {
       if (status === 'paid') await c.query(`UPDATE invoices SET status = 'paid' WHERE order_id = $1`, [oid]);
       if (status === 'cancelled') await c.query(`UPDATE invoices SET status = 'void' WHERE order_id = $1`, [oid]);
       await audit(c, o.user_id, `admin.order.${status}`, { order: o.order_no, total: o.total });
+    });
+  },
+
+  /* edit an order and keep its payment and invoice in step */
+  async orderEdit([oid, d = {}]) {
+    oid = id(oid);
+    const amount = Number(d.amount), discount = Math.max(0, Number(d.discount || 0)), gst = d.gst_rate === '' || d.gst_rate == null ? 18 : Number(d.gst_rate);
+    if (!(amount >= 0)) throw new UserError('Amount is not a number.');
+    if (discount > amount) throw new UserError('Discount is larger than the amount.');
+    if (!(gst >= 0 && gst <= 50)) throw new UserError('GST rate must be 0 to 50 %.');
+    const when = d.created_at ? date(d.created_at, 'Order date') : null;
+    const inv = str(d.invoice_no, 40);
+    return tx(async c => {
+      const o = (await c.query(`UPDATE orders SET description = $2, amount = $3, discount = $4, gst_rate = $5, coupon_code = $6,
+                                  created_at = coalesce($7::timestamptz, created_at)
+                                WHERE id = $1 RETURNING id, user_id, order_no, amount, discount, gst_amount, total, created_at`,
+        [oid, str(d.description, 200) || 'Order', amount, discount, gst, nul(d.coupon_code, 40), when])).rows[0];
+      if (!o) throw new UserError('That order was not found.');
+      await c.query(`UPDATE payments SET amount = $2, paid_at = $3 WHERE order_id = $1`, [oid, o.total, o.created_at]);
+      await c.query(`UPDATE invoices SET subtotal = $2, gst_amount = $3, total = $4, issued_at = $5,
+                       invoice_no = CASE WHEN $6 = '' THEN invoice_no ELSE $6 END WHERE order_id = $1`,
+        [oid, o.amount - o.discount, o.gst_amount, o.total, o.created_at, inv])
+        .catch(e => { if (e.code === '23505') throw new UserError('Another order already uses that invoice number.'); throw e; });
+      await audit(c, o.user_id, 'admin.order.edited', { order: o.order_no, total: o.total });
+      return o;
     });
   },
 

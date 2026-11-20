@@ -28,7 +28,7 @@ uses on port 3000. Edits to `api/*.js` route files are picked up without a resta
 | Overview | MRR, ARR, revenue, growth, sign-ins, usage heatmap (IST), funnel, plan mix, ending-soon, payment trouble, live activity feed |
 | Activity | Every sign-in attempt, live sessions (revoke), the full audit trail, IPs with failures |
 | Users | Search, filter (paying, trial, website sign-ups, at risk, idle…), health score, CSV export, bulk email/push, +30 days, suspend. Customers who created their own account on eimc.vercel.app carry a **Website** tag (`users.signup_source`). |
-| User | Profile, plan, access dates, licence & PCs, sessions, password, 2-step, orders, refunds, payment methods, tickets, messages, timeline |
+| User | Everything the customer sees, editable: client ID, name, email, mobile, member-since date, status, verification, profile and billing/GST details, notification switches, plan, cycle, price, dates, seats, licence key, Dhan client and date, PCs (name, OS, version), sessions, 2-step, orders (item, date, amount, discount, GST, coupon, invoice no.), payment methods (add/edit), messages (read/unread/delete), tickets, timeline. Passwords are bcrypt hashes and cannot be shown; set a new one (typed or generated, visible before saving) instead. |
 | Subscriptions | Every current plan, MRR by plan, ending soon, one-click +30 days |
 | Orders & revenue | Monthly revenue, revenue by plan, refund or mark paid, CSV |
 | Plans & pricing | Monthly price, regular (struck-through) price, PC limit, on-sale switch, feature matrix. eimc.vercel.app reads these live through its `/api/plans`, so the pricing, offer, buy and account pages follow within a minute. Plans sold: Free and Pro, monthly only. |
