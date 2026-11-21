@@ -6,7 +6,7 @@ import crypto from 'node:crypto';
 import { audit, many, one, q, tx } from './_db.js';
 import { UserError, body, guarded, send } from './_auth.js';
 import { fill, renderEmail, sendMail } from './_mail.js';
-import { qi, tableMeta } from './q.js';
+import { qi, relayCall, tableMeta } from './q.js';
 
 const str = (v, max = 200) => String(v ?? '').trim().slice(0, max);
 const nul = (v, max = 200) => { const s = str(v, max); return s === '' ? null : s; };
@@ -373,6 +373,47 @@ const actions = {
     if (on && confirmed !== 'DHAN-CONFIRMED') throw new UserError('Tick the box confirming Dhan has approved this in writing first.');
     await q(`UPDATE app_policy SET relay_enabled = $1, updated_at = now()`, [on]);
     await audit(null, null, on ? 'admin.relay.enabled' : 'admin.relay.disabled');
+  },
+
+  /* ═══════════════════════════════════ relay server controls (Relay server page) */
+  /* reconnect customers: { conn_ids:[..] } | { user_id } | { all:true }; their terminals reconnect at once */
+  async relayKick([target = {}]) {
+    const body = {};
+    if (target.all === true) body.all = true;
+    else if (target.user_id != null) body.user_id = Number(id(target.user_id));
+    else if (Array.isArray(target.conn_ids)) body.conn_ids = target.conn_ids.map(Number).filter(n => Number.isInteger(n) && n > 0).slice(0, 2000);
+    if (!body.all && !body.user_id && !body.conn_ids?.length) throw new UserError('Choose who to reconnect.');
+    const { data } = await relayCall('/admin/kick', { method: 'POST', body });
+    await audit(null, body.user_id || null, 'admin.relay.reconnect', { ...body, closed: data?.closed ?? 0 });
+    return data;
+  },
+
+  /* close every Dhan socket; the relay reopens them within a second or two */
+  async relayRestart() {
+    const { data } = await relayCall('/admin/restart-upstream', { method: 'POST', body: {} });
+    await audit(null, null, 'admin.relay.restart_upstream', { closed: data?.closed ?? 0 });
+    return data;
+  },
+
+  /* which books get 200-level depth: up to 3 of "NIFTY-FUT" / "NSE_FNO:35001"; null = the relay's default */
+  async relayDeep([spec]) {
+    let v = null;
+    if (spec != null && spec !== 'default') {
+      const parts = String(spec).split(',').map(s => s.trim()).filter(Boolean)
+        .map(s => (/^[A-Za-z0-9&]+-FUT$/i.test(s) ? s.toUpperCase() : s));
+      if (parts.length > 3) throw new UserError('Dhan allows at most 3 books at 200 levels.');
+      for (const p of parts) if (!/^[A-Z0-9&]+-FUT$/.test(p) && !/^(NSE_FNO|BSE_FNO|NSE_EQ|BSE_EQ|MCX_COMM):\d{1,12}$/.test(p))
+        throw new UserError(`"${p}" is not a book: use an index future like NIFTY-FUT or a key like NSE_FNO:35001.`);
+      v = [...new Set(parts)].join(',');
+    }
+    try { await q(`UPDATE app_policy SET relay_deep = $1, updated_at = now()`, [v]); }
+    catch (e) { if (e.code === '42703') throw new UserError('The database needs 11_relay_monitor.sql first.'); throw e; }
+    await audit(null, null, 'admin.relay.deep_list', { relay_deep: v });
+    return { relay_deep: v };
+  },
+
+  async relayAlertAck([alertId]) {
+    await q(`UPDATE relay_alerts SET acked_at = now(), acked_by = 'admin' WHERE id = $1 AND acked_at IS NULL`, [id(alertId)]);
   },
 
   async serviceSave([d = {}]) {

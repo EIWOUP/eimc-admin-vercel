@@ -1,6 +1,6 @@
 /* GET /api/q?v=<view>[&id=..]   - every read the admin makes.
    Views: overview, users, user, subs, orders, activity, tickets, ticket, ideas, plans,
-          messages, tables, table, search, pulse, access, cutoff, market, abuse */
+          messages, tables, table, search, pulse, access, cutoff, market, relay, relayHistory, abuse */
 import { many, one } from './_db.js';
 import { UserError, guarded, query, send } from './_auth.js';
 import { mailMode } from './_mail.js';
@@ -411,6 +411,98 @@ async function relayHealth() {
   }
 }
 
+/* ════════════════════════════════════════════════ relay server: live + history (DB 11) */
+/* any relay admin endpoint with RELAY_ADMIN_TOKEN; throws a readable UserError when it cannot answer */
+export async function relayCall(path, { method = 'GET', body, timeout = 4000 } = {}) {
+  const url = (process.env.RELAY_URL || '').replace(/\/+$/, '');
+  if (!url) throw new UserError('No relay yet: set RELAY_URL and RELAY_ADMIN_TOKEN on this site.');
+  const t0 = Date.now();
+  let r;
+  try {
+    r = await fetch(`${url}${path}`, {
+      method, signal: AbortSignal.timeout(timeout),
+      headers: { authorization: `Bearer ${process.env.RELAY_ADMIN_TOKEN || ''}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    throw new UserError(e.name === 'TimeoutError' ? `The relay did not answer within ${timeout / 1000} s.` : 'Cannot reach the relay server.', 502);
+  }
+  const data = await r.json().catch(() => null);
+  if (!r.ok) throw new UserError(data?.error === 'unauthorised' ? 'The relay refused RELAY_ADMIN_TOKEN: it must match the relay\'s .env.' : `The relay answered ${r.status}.`, 502);
+  return { data, ms: Date.now() - t0, url };
+}
+
+const relayAlerts = () => many(`SELECT id, kind, level, message, started_at, last_seen_at, resolved_at, acked_at, acked_by, notified_at
+    FROM relay_alerts ORDER BY (resolved_at IS NULL) DESC, started_at DESC LIMIT 40`).catch(() => []);
+
+async function relayLive() {
+  let live = null, error = null;
+  try { live = await relayCall('/health?full=1'); } catch (e) { error = e.message; }
+  const conns = live?.data?.conns || [];
+  const uids = [...new Set(conns.map(c => String(c.user_id)))];
+  const dhs = [...new Set(conns.map(c => c.dh).filter(Boolean))];
+  const [people, pcs, alerts, events, policy] = await Promise.all([
+    uids.length ? many(`SELECT u.id, u.full_name, u.client_id, u.email, p.city, p.state, s.plan_code, s.status AS sub_status
+        FROM users u LEFT JOIN user_profiles p ON p.user_id = u.id
+        LEFT JOIN subscriptions s ON s.user_id = u.id AND s.is_current WHERE u.id = ANY($1::bigint[])`, [uids]) : [],
+    dhs.length ? many(`SELECT device_hash, label, os FROM devices WHERE device_hash = ANY($1::text[])`, [dhs]) : [],
+    relayAlerts(),
+    many(`SELECT e.at, e.event, e.reason, e.app_version, host(e.ip) AS ip, e.details, u.id AS user_id, u.full_name, u.client_id
+            FROM licence_events e LEFT JOIN users u ON u.id = e.user_id
+           WHERE e.event IN ('relay_connect', 'relay_drop') OR (e.event = 'denied' AND e.reason LIKE 'RELAY%')
+           ORDER BY e.at DESC LIMIT 60`),
+    one(`SELECT relay_enabled, relay_deep FROM app_policy`).catch(() => one(`SELECT relay_enabled, NULL::text AS relay_deep FROM app_policy`)),
+  ]);
+  const P = Object.fromEntries(people.map(p => [String(p.id), p]));
+  const D = Object.fromEntries(pcs.map(p => [p.device_hash, p]));
+  for (const c of conns) {
+    const p = P[String(c.user_id)] || {};
+    const d = D[c.dh] || {};
+    Object.assign(c, { name: p.full_name || `User ${c.user_id}`, client_id: p.client_id, city: p.city || p.state || null,
+      sub_status: p.sub_status, plan_code: p.plan_code, pc_label: d.label || null, os: d.os || null });
+    delete c.dh;
+  }
+  return { at: new Date().toISOString(), configured: !!process.env.RELAY_URL, error, ms: live?.ms ?? null, url: live?.url || process.env.RELAY_URL || null,
+    relay: live?.data || null, alerts, events, policy };
+}
+
+const RANGES = { '24h': ['24 hours', '10 minutes'], '7d': ['7 days', '1 hour'], '30d': ['30 days', '6 hours'] };
+async function relayHistory(range) {
+  const [span, bin] = RANGES[range] || RANGES['24h'];
+  try {
+    const [series, drops, daily, days, heat, top] = await Promise.all([
+      many(`SELECT date_bin($1::interval, at, TIMESTAMPTZ '2000-01-01') AS t,
+                   max(customers) AS peak, avg(customers) AS customers, max(connections) AS conns, avg(instruments) AS instruments,
+                   avg(msgs_out) AS msgs_out, avg(ticks_in) AS ticks_in, avg(delay_p50) AS delay_p50, max(delay_p99) AS delay_p99,
+                   avg(net_p50) AS net_p50, avg(feed_lag) AS feed_lag, avg(cpu) AS cpu, max(cpu) AS cpu_max, avg(mem) AS mem,
+                   avg(relay_mb) AS relay_mb, avg(net_out_kbs) AS net_out, avg(net_in_kbs) AS net_in,
+                   sum(rest_req) AS rest_req, sum(dhan_calls) AS dhan_calls, sum(slow_drops) AS slow_drops
+              FROM relay_stats WHERE at > now() - $2::interval GROUP BY 1 ORDER BY 1`, [bin, span]),
+      many(`SELECT coalesce(reason, '—') AS reason, count(*)::int AS n FROM licence_events
+             WHERE event = 'relay_drop' AND at > now() - $1::interval GROUP BY 1 ORDER BY 2 DESC`, [span]),
+      many(`SELECT (at AT TIME ZONE '${TZ}')::date AS day, count(DISTINCT user_id)::int AS users, count(*)::int AS connects
+              FROM licence_events WHERE event = 'relay_connect' AND at > now() - interval '30 days' GROUP BY 1`),
+      many(`SELECT (at AT TIME ZONE '${TZ}')::date AS day, round(sum(customers) / 60.0, 1) AS customer_hours, max(customers) AS peak,
+                   round(avg(delay_p99)::numeric, 1) AS delay_p99, round(sum(msgs_out) * 60) AS msgs, round(avg(cpu)::numeric, 1) AS cpu
+              FROM relay_stats WHERE at > now() - interval '30 days' GROUP BY 1`),
+      many(`SELECT extract(isodow FROM at AT TIME ZONE '${TZ}')::int AS dow, extract(hour FROM at AT TIME ZONE '${TZ}')::int AS hr,
+                   round(avg(customers)::numeric, 1) AS n
+              FROM relay_stats WHERE at > now() - interval '30 days' GROUP BY 1, 2`),
+      many(`SELECT e.user_id, u.full_name, u.client_id, sum((e.details->>'secs')::int)::int AS secs, count(*)::int AS sessions
+              FROM licence_events e JOIN users u ON u.id = e.user_id
+             WHERE e.event = 'relay_drop' AND e.details ? 'secs' AND e.at > now() - $1::interval
+             GROUP BY 1, 2, 3 ORDER BY 4 DESC LIMIT 10`, [span]),
+    ]);
+    const byDay = {};
+    for (const d of daily) byDay[String(d.day).slice(0, 10)] = { day: d.day, users: d.users, connects: d.connects };
+    for (const d of days) Object.assign(byDay[String(d.day).slice(0, 10)] ||= { day: d.day, users: 0, connects: 0 }, d);
+    return { range, series, drops, heat, top, days: Object.values(byDay).sort((a, b) => new Date(b.day) - new Date(a.day)) };
+  } catch (e) {
+    if (e.code === '42P01') throw new UserError('The database needs 11_relay_monitor.sql first: DB\\setup-database.ps1 -Target neon -Migrate 11_relay_monitor.sql');
+    throw e;
+  }
+}
+
 /* ════════════════════════════════════════════════ abuse flags (DB 10: eimc.abuse_flags) */
 // Accounts that look shared, copied or farmed. Nothing is blocked automatically: the admin looks,
 // acts on the user page (sign out, block a PC, suspend), or marks the flag reviewed.
@@ -444,7 +536,9 @@ async function flagCount() {
 }
 
 /* ════════════════════════════════════════════════ pulse: the small live numbers in the top bar */
-const pulse = async () => ({ ...(await pulseRow()), flags: await flagCount() });
+const pulse = async () => ({ ...(await pulseRow()), flags: await flagCount(), relay_alerts: await relayAlertCount() });
+const relayAlertCount = () => one(`SELECT count(*)::int AS n FROM relay_alerts WHERE resolved_at IS NULL AND acked_at IS NULL AND level <> 'info'`)
+  .then(r => r.n, () => 0);
 const pulseRow = () => one(`SELECT
     (SELECT count(*) FROM sessions WHERE NOT revoked AND expires_at > now() AND last_used_at > now() - interval '15 minutes')::int AS online,
     (SELECT count(*) FROM support_tickets WHERE status IN ('open','in_progress'))::int AS tickets,
@@ -474,6 +568,8 @@ const VIEWS = {
   access: () => access(),
   cutoff: qs => cutoff(qs.version),
   market: () => market(),
+  relay: () => relayLive(),
+  relayHistory: qs => relayHistory(qs.range),
   abuse: () => abuse(),
 };
 
