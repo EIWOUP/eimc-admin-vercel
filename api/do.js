@@ -31,6 +31,7 @@ const PRIORITY = ['low', 'normal', 'high', 'urgent'];
 const IDEA_STATUS = ['new', 'review', 'considering', 'planned', 'shipped'];
 const ORDER_STATUS = ['created', 'paid', 'failed', 'refunded', 'cancelled'];
 const CHANNELS = ['in_app', 'push', 'email', 'sms', 'whatsapp'];
+const ABUSE_SIGNALS = ['licence_copied', 'token_reuse', 'device_mismatch', 'many_places', 'pc_churn', 'shared_pc', 'signup_burst'];
 const licenceKey = () => 'EIMC-' + Array.from({ length: 3 }, () => crypto.randomBytes(2).toString('hex').toUpperCase()).join('-');
 
 async function planPrice(c, code, cycle) {
@@ -258,6 +259,22 @@ const actions = {
     uid = id(uid);
     const r = await q(`UPDATE subscriptions SET is_current = false, status = 'expired', auto_renew = false WHERE user_id = $1 AND is_current`, [uid]);
     await audit(null, uid, 'admin.subscription.removed', { rows: r.rowCount });
+  },
+
+  /* ═══════════════════════════════════════════════════════ abuse flags */
+  // "Reviewed": the flag stays hidden until new evidence arrives after this moment.
+  async abuseReview([uid, signal, note]) {
+    uid = id(uid);
+    const sigs = signal === 'all'
+      ? (await many(`SELECT DISTINCT signal FROM eimc.abuse_flags() WHERE user_id = $1`, [uid])).map(r => r.signal)
+      : [pick(signal, ABUSE_SIGNALS, 'flag')];
+    for (const s of sigs) {
+      await q(`INSERT INTO abuse_reviews (user_id, signal, reviewed_by, note) VALUES ($1, $2, 'admin', $3)
+               ON CONFLICT (user_id, signal) DO UPDATE SET reviewed_at = now(), reviewed_by = 'admin', note = EXCLUDED.note`,
+        [uid, s, nul(note, 500)]);
+    }
+    await audit(null, uid, 'admin.abuse.reviewed', { signals: sigs, note: nul(note, 500) });
+    return { reviewed: sigs.length };
   },
 
   /* ═══════════════════════════════════════════════════════ licence & devices */

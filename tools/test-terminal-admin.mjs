@@ -187,9 +187,33 @@ async function main() {
   const evs = await sql(`SELECT reason FROM licence_events WHERE user_id = $1 AND event = 'signout'`, [d.user_id]);
   ok(['ADMIN_SIGNOUT', 'ADMIN_BLOCK', 'ADMIN_SIGNOUT_ALL'].every(x => evs.some(e => e.reason === x)), 'admin sign-outs logged as licence events');
 
+  // ---- abuse flags (DB 10)
+  const victim = d.user_id;
+  await sql(`DELETE FROM abuse_reviews WHERE user_id = $1`, [victim]);
+  await sql(`INSERT INTO licence_events (user_id, event) VALUES ($1, 'token_reuse')`, [victim]);
+  await sql(`INSERT INTO licence_events (user_id, event, reason, ip, details)
+             SELECT $1, 'relay_drop', 'REPLACED', '21.0.0.1', jsonb_build_object('new_ip', '22.0.0.' || k) FROM generate_series(1, 3) k`, [victim]);
+  r = await get('abuse');
+  const mine = r.status === 200 ? r.json.flags.filter(f => String(f.user_id) === String(victim)).map(f => f.signal) : [];
+  ok(mine.includes('token_reuse') && mine.includes('licence_copied'), `abuse view flags a copied licence and a reused token (${r.status})`);
+  r = await get('user', { id: victim });
+  ok(r.status === 200 && r.json.flags.some(f => f.signal === 'licence_copied'), 'the user page shows the account\'s flags');
+  r = await get('pulse');
+  ok(r.status === 200 && r.json.flags >= 1, 'the sidebar badge counts flagged accounts');
+  r = await doA('abuseReview', victim, 'teleport', '');
+  ok(r.status === 400, 'an unknown flag cannot be reviewed');
+  r = await doA('abuseReview', victim, 'all', 'checked with the customer');
+  ok(r.status === 200 && r.json.reviewed >= 2, 'mark every flag of an account reviewed');
+  r = await get('abuse');
+  ok(!r.json.flags.some(f => String(f.user_id) === String(victim)) && r.json.reviews.some(x => String(x.user_id) === String(victim) && x.note === 'checked with the customer'),
+     'reviewed flags are hidden, and listed under recently reviewed with the note');
+  await sql(`INSERT INTO licence_events (user_id, event, at) VALUES ($1, 'token_reuse', now() + interval '2 seconds')`, [victim]);
+  r = await get('abuse');
+  ok(r.json.flags.some(f => String(f.user_id) === String(victim) && f.signal === 'token_reuse'), 'new evidence after the review brings the flag back');
+
   const acts = (await sql(`SELECT DISTINCT action FROM audit_log WHERE actor = 'admin'`)).map(x => x.action);
   ok(['admin.policy.saved', 'admin.release.created', 'admin.service.down', 'admin.notice.created', 'admin.relay.enabled',
-      'admin.house_token.saved', 'admin.device.block', 'admin.licence.signout_all'].every(a => acts.includes(a)), 'every change is in the audit log');
+      'admin.house_token.saved', 'admin.device.block', 'admin.licence.signout_all', 'admin.abuse.reviewed'].every(a => acts.includes(a)), 'every change is in the audit log');
   const leaked = await sql(`SELECT count(*)::int n FROM audit_log WHERE details::text LIKE '%' || $1 || '%'`, [good.slice(10, 40)]);
   ok(leaked[0].n === 0, 'the audit log never holds the Dhan token');
 }

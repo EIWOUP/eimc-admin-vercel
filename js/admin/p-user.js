@@ -3,6 +3,7 @@
 import { $, $$, api, html, put, raw, icon, num, inr, ago, date, dtime, dshort, isoLocal, avatar, subPill, planPill, userPill, orderPill, ticketPill,
   health, healthColor, modal, toast, fail, act, confirmBox, copy, cap, daysLeft, countUp, lights } from './core.js';
 import { barChart } from './charts.js';
+import { SIGNALS, flagPill } from './p-abuse.js';
 
 let D, uid, tab = 'overview', CTX;
 const LEV = { activate: 'ok', refresh: 'mute', signout: 'mute', denied: 'warn', relay_connect: 'info', relay_drop: 'mute', token_reuse: 'bad' };
@@ -135,7 +136,7 @@ const PANES = {
         <div><span>Trades</span><b>${p.trades || '—'}</b></div>
         <div><span>2-step sign-in</span><b>${D.security?.two_factor_enabled ? `On (${D.security.two_factor_method || 'email'})` : 'Off'}</b></div>
         <div><span>Licence</span><b class="mono">${D.licence ? (D.licence.revoked ? 'Revoked' : D.licence.licence_key) : 'None'}</b></div>
-        <div><span>Dhan</span><b>${D.licence ? cap(D.licence.broker_status) : '—'}</b></div>
+        <div><span>Abuse flags</span><b>${D.flags?.length ? D.flags.map(f => html`${flagPill(f)} `) : 'None'}</b></div>
         <div><span>Renewal</span><b>${s ? (s.cancel_at_period_end ? 'Will not renew' : s.auto_renew ? 'Auto-renews' : 'Manual') : '—'}</b></div>
         <div><span>Marketing emails</span><b>${D.prefs?.offers ? 'Yes' : 'No'}</b></div>
       </div></div>
@@ -212,14 +213,14 @@ const PANES = {
 
   licence() {
     const l = D.licence;
-    return html`<div class="card glow lit"><div class="card-h"><h2>${icon('key')} Licence key</h2>${l ? html`<small>issued ${date(l.issued_at)}${l.last_issued_at ? ` · re-issued ${date(l.last_issued_at)}` : ''}</small>` : ''}</div>
+    return html`${D.flags?.length ? html`<div class="card lit" style="border-color:var(--heat-t)"><div class="card-h"><h2>${icon('alert')} Abuse flags</h2><div class="r"><a class="btn btn-sm" href="#/abuse">All flags</a></div></div>
+      ${D.flags.map(f => html`<div style="margin-bottom:10px">${flagPill(f)} <small>${ago(f.last_at)}</small><div class="mini" style="margin-top:4px">${SIGNALS[f.signal]?.what || ''} <b>Usually:</b> ${SIGNALS[f.signal]?.fix || ''}</div></div>`)}
+    </div>` : ''}
+    <div class="card glow lit ${D.flags?.length ? 'mt20' : ''}"><div class="card-h"><h2>${icon('key')} Licence key</h2>${l ? html`<small>issued ${date(l.issued_at)}${l.last_issued_at ? ` · re-issued ${date(l.last_issued_at)}` : ''}</small>` : ''}</div>
       ${l ? html`<div class="lkey"><span style="${l.revoked ? 'text-decoration:line-through;color:var(--ash)' : ''}">${l.licence_key}</span>${l.revoked ? html`<span class="st-pill bad">Revoked</span>` : html`<span class="st-pill ok">Active</span>`}<button type="button" class="btn btn-sm btn-quiet" data-copy="${l.licence_key}">${icon('copy')}Copy</button></div>
         <div class="form-g mt20">
           <div class="fld"><label>Max PCs</label><input type="number" min="1" max="50" value="${l.max_devices}" data-l="devices"></div>
-          <div class="fld"><label>Dhan connection</label><select data-l="broker">${['connected', 'not connected', 'expired'].map(o => html`<option ${o === l.broker_status ? 'selected' : ''}>${o}</option>`)}</select></div>
           <div class="fld"><label>App version</label><input value="${l.app_version}" data-l="version"></div>
-          <div class="fld"><label>Dhan client (as they see it)</label><input value="${l.broker_client_masked || ''}" placeholder="e.g. ••••4321" data-l="broker_client"></div>
-          <div class="fld"><label>Dhan connected since</label><input type="datetime-local" value="${isoLocal(l.broker_since)}" data-l="broker_since"></div>
           <div class="fld wide"><label>Licence key (edit to set your own)</label><input class="mono" value="${l.licence_key}" data-l="key" maxlength="19" style="text-transform:uppercase"></div>
         </div>
         <div class="qa mt20"><button type="button" class="btn" data-lic="regenerate">${icon('refresh')}New key</button>

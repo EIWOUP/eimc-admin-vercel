@@ -1,6 +1,6 @@
 /* GET /api/q?v=<view>[&id=..]   - every read the admin makes.
    Views: overview, users, user, subs, orders, activity, tickets, ticket, ideas, plans,
-          messages, tables, table, search, pulse */
+          messages, tables, table, search, pulse, access, cutoff, market, abuse */
 import { many, one } from './_db.js';
 import { UserError, guarded, query, send } from './_auth.js';
 import { mailMode } from './_mail.js';
@@ -206,10 +206,12 @@ async function user(uid) {
     many(`SELECT e.id, e.event, e.reason, e.app_version, host(e.ip) AS ip, e.at, d.label AS pc
             FROM licence_events e LEFT JOIN devices d ON d.id = e.device_id WHERE e.user_id = $1 ORDER BY e.at DESC LIMIT 80`, [uid]),
   ]);
+  const flags = await many(`SELECT signal, score, detail, last_at FROM eimc.abuse_flags() WHERE user_id = $1 ORDER BY last_at DESC`, [uid])
+    .catch(() => []);                                     // a database without 10_abuse.sql
   const days = await many(`WITH d AS (SELECT generate_series((now() AT TIME ZONE $2)::date - 29, (now() AT TIME ZONE $2)::date, '1 day')::date AS day)
      SELECT d.day::text AS day, count(h.id)::int AS n FROM d LEFT JOIN login_history h ON h.user_id = $1 AND h.success AND (h.at AT TIME ZONE $2)::date = d.day
       GROUP BY d.day ORDER BY d.day`, [uid, TZ]);
-  return { user: u, profile, security, prefs, sub, history, licence, devices, sessions, logins, orders, methods, tickets, notes, feed, ideas, plans, stats, days, licenceEvents };
+  return { user: u, profile, security, prefs, sub, history, licence, devices, sessions, logins, orders, methods, tickets, notes, feed, ideas, plans, stats, days, licenceEvents, flags };
 }
 
 /* ════════════════════════════════════════════════ the other pages */
@@ -409,8 +411,41 @@ async function relayHealth() {
   }
 }
 
+/* ════════════════════════════════════════════════ abuse flags (DB 10: eimc.abuse_flags) */
+// Accounts that look shared, copied or farmed. Nothing is blocked automatically: the admin looks,
+// acts on the user page (sign out, block a PC, suspend), or marks the flag reviewed.
+async function abuse() {
+  try {
+    const [flags, reviews] = await Promise.all([
+      many(`SELECT f.user_id, f.signal, f.score, f.detail, f.last_at, u.full_name, u.client_id, u.email, u.status AS user_status,
+                   s.plan_code, s.status AS sub_status, l.max_devices,
+                   (SELECT count(*) FROM devices d WHERE d.user_id = f.user_id AND NOT d.revoked AND NOT d.blocked)::int AS pcs
+              FROM eimc.abuse_flags() f JOIN users u ON u.id = f.user_id
+              LEFT JOIN subscriptions s ON s.user_id = f.user_id AND s.is_current
+              LEFT JOIN licences l ON l.user_id = f.user_id
+             ORDER BY f.last_at DESC LIMIT 1000`),
+      many(`SELECT r.user_id, r.signal, r.reviewed_at, r.reviewed_by, r.note, u.full_name, u.client_id
+              FROM abuse_reviews r JOIN users u ON u.id = r.user_id ORDER BY r.reviewed_at DESC LIMIT 50`),
+    ]);
+    return { flags, reviews };
+  } catch (e) {
+    if (e.code === '42883' || e.code === '42P01') throw new UserError('The database needs 10_abuse.sql first: DB\\setup-database.ps1 -Target neon -Migrate 10_abuse.sql');
+    throw e;
+  }
+}
+
+// how many accounts are flagged, for the sidebar badge: recomputed at most every 5 minutes
+let flagCache = { at: 0, n: 0 };
+async function flagCount() {
+  if (Date.now() - flagCache.at < 5 * 60e3) return flagCache.n;
+  const r = await one(`SELECT count(DISTINCT user_id)::int AS n FROM eimc.abuse_flags()`).catch(() => ({ n: 0 }));
+  flagCache = { at: Date.now(), n: r.n };
+  return r.n;
+}
+
 /* ════════════════════════════════════════════════ pulse: the small live numbers in the top bar */
-const pulse = () => one(`SELECT
+const pulse = async () => ({ ...(await pulseRow()), flags: await flagCount() });
+const pulseRow = () => one(`SELECT
     (SELECT count(*) FROM sessions WHERE NOT revoked AND expires_at > now() AND last_used_at > now() - interval '15 minutes')::int AS online,
     (SELECT count(*) FROM support_tickets WHERE status IN ('open','in_progress'))::int AS tickets,
     (SELECT count(*) FROM login_history WHERE NOT success AND at > now() - interval '1 hour')::int AS fails_1h,
@@ -439,6 +474,7 @@ const VIEWS = {
   access: () => access(),
   cutoff: qs => cutoff(qs.version),
   market: () => market(),
+  abuse: () => abuse(),
 };
 
 export default guarded(async (req, res) => {
