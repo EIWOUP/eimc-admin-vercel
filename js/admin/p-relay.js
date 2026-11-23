@@ -98,7 +98,7 @@ export async function render(root, ctx) {
     <div class="btns">
       <button type="button" class="btn btn-sm" data-act="deep">${icon('layers')}200-level books</button>
       <button type="button" class="btn btn-sm" data-act="kick-all">${icon('refresh')}Reconnect everyone</button>
-      <button type="button" class="btn btn-sm btn-gold" data-act="restart">${icon('zap')}Restart Dhan link</button>
+      <button type="button" class="btn btn-sm btn-gold" data-act="restart">${icon('zap')}Restart EIMC-DATA link</button>
     </div>
   </div>
   <div id="rl-banner"></div>
@@ -129,7 +129,7 @@ export async function render(root, ctx) {
   <div class="g rl-g2 mt20">
     <div class="card flush lit"><div class="card-h" style="padding:20px 22px 0"><h2>${icon('eye')} What people are watching</h2><small id="rl-sym-sub"></small></div>
       <div id="rl-syms"></div></div>
-    <div class="card lit"><div class="card-h"><h2>${icon('zap')} Dhan connection</h2><small>5 sockets per account</small></div>
+    <div class="card lit"><div class="card-h"><h2>${icon('zap')} EIMC-DATA connection</h2><small>5 sockets per account</small></div>
       <div id="rl-sockets"></div>
       <div id="rl-token" class="mt20"></div>
       <div id="rl-rest" class="mt20"></div></div>
@@ -221,11 +221,11 @@ function paintFlow(r) {
   const feed = socks.find(s => s.key === 'feed');
   put($('#rl-flow'), html`
     <div class="rl-node rl-dhan">
-      <div class="rl-nk">${icon('globe')}Dhan · house account</div>
+      <div class="rl-nk">${icon('globe')}EIMC-DATA · house account</div>
       <div class="rl-nv">${num(feed?.load || 0)}<small>symbols subscribed</small></div>
       <div class="rl-slots">${slots.map(s => s
         ? html`<span class="rl-slot ${STATE[s.state] || 'mute'}" title="${s.label}: ${s.state}${s.reconnects ? ` · ${s.reconnects} reconnects` : ''}"><i></i>${s.key === 'feed' ? 'Feed' : s.key === 'depth20' ? '20L' : '200L'}</span>`
-        : html`<span class="rl-slot free" title="Free: Dhan allows 5 sockets per account"><i></i>free</span>`)}</div>
+        : html`<span class="rl-slot free" title="Free: EIMC-DATA allows 5 sockets per account"><i></i>free</span>`)}</div>
     </div>
     <div class="rl-pipe">${stream(tin, 'in')}<div class="rl-pl"><b>${rate(tin)}</b> ticks/s in</div></div>
     <div class="rl-node rl-core ${t99}">
@@ -249,13 +249,13 @@ function paintKpis(r) {
     ${tile('People online', 'users', num(r.customers), html`<span>${cap.more != null ? `room for ~${num(cap.more)} more` : 'connected now'}</span>`, T.people, 'var(--c1)')}
     ${tile('Open sockets', 'monitor', num(r.connections), html`<span>${num(hub.lingering || 0)} symbols lingering</span>`, T.conns, 'var(--c4)')}
     ${tile('Symbols live', 'eye', num(r.instruments), html`<span>${num(hub.depth20_books || 0)} with 20-level · ${num(hub.deep_books || 0)} with 200-level</span>`, null)}
-    ${tile('Messages / s', 'send', rate(hub.msgs_out_per_s), html`<span>${rate(hub.ticks_in_per_s)} ticks/s from Dhan</span>`, T.msgs, 'var(--c2)')}
+    ${tile('Messages / s', 'send', rate(hub.msgs_out_per_s), html`<span>${rate(hub.ticks_in_per_s)} ticks/s from EIMC-DATA</span>`, T.msgs, 'var(--c2)')}
     ${tile('Delay p99', 'clock', p99 == null ? '—' : html`${Math.round(p99)}<small>ms</small>`, html`<b class="${p99 == null ? 'flat' : p99 > 500 ? 'down' : p99 > 150 ? 'flat' : 'rise'}">${p99 == null ? 'idle' : p99 > 500 ? 'slow' : p99 > 150 ? 'ok' : 'fast'}</b><span>p50 ${ms(lat.relay?.p50)}</span>`, T.p99, TONE_C[tone(p99, 150, 500)])}`);
 }
 
 function paintPath(r) {
   const p = r.latency?.path_p50 || {}, lat = r.latency || {};
-  const parts = [['Exchange → relay ≈', p.exchange, 'var(--c3)', 'From the trade on the exchange to the relay. Dhan stamps trades in whole seconds, so this is an estimate (±0.5 s): watch its trend, not one value'],
+  const parts = [['Exchange → relay ≈', p.exchange, 'var(--c3)', 'From the trade on the exchange to the relay. EIMC-DATA stamps trades in whole seconds, so this is an estimate (±0.5 s): watch its trend, not one value'],
     ['Inside the relay', p.relay, 'var(--c2)', 'Waiting in a customer\'s queue before being sent'],
     ['Relay → customer', p.network, 'var(--c4)', 'Half the ping round trip to the terminal']];
   const known = parts.filter(x => x[1] != null), total = known.reduce((a, x) => a + x[1], 0);
@@ -338,13 +338,13 @@ function paintSockets(r) {
       <div class="rl-sh"><i></i><b>${s.label}</b><span class="st-pill ${STATE[s.state] || 'mute'}">${s.state}</span></div>
       <div class="rl-sm"><span>${s.state === 'connected' ? 'up' : 'for'} ${dur(s.for_s)}</span><span>${num(s.reconnects)} reconnect${s.reconnects === 1 ? '' : 's'}</span><span>${s.last_msg_s == null ? 'no data yet' : `last data ${dur(s.last_msg_s)} ago`}</span></div>
       <div class="rl-load" title="${num(s.load)} of ${num(s.cap)}"><i style="--w:${Math.min(100, (s.load / (s.cap || 1)) * 100)}%"></i><span>${num(s.load)} / ${num(s.cap)}</span></div>
-    </div>` : html`<div class="rl-sock free"><div class="rl-sh"><i></i><b>Free socket</b></div><div class="rl-sm"><span>Dhan allows 5 per account. Add a 200-level book to use it.</span></div></div>`)}</div>`);
+    </div>` : html`<div class="rl-sock free"><div class="rl-sh"><i></i><b>Free socket</b></div><div class="rl-sm"><span>EIMC-DATA allows 5 per account. Add a 200-level book to use it.</span></div></div>`)}</div>`);
 
   const t = r.house_token || {}, left = t.expires_in_min;
   const tt = !t.token ? 'bad' : left == null ? 'mute' : left <= 0 ? 'bad' : left < 120 ? 'warn' : 'ok';
   const pctLeft = left == null ? 0 : Math.max(0, Math.min(100, (left / (24 * 60)) * 100));
   put($('#rl-token'), html`<div class="rl-tok ${tt}">
-      <div class="rl-tk-h"><span>${icon('key')}Dhan token ${t.client ? html`<span class="mono">${t.client}</span>` : ''}</span><span class="st-pill ${tt}">${!t.token ? 'none' : left <= 0 ? 'expired' : left < 120 ? 'expiring' : 'valid'}</span></div>
+      <div class="rl-tk-h"><span>${icon('key')}EIMC-DATA token ${t.client ? html`<span class="mono">${t.client}</span>` : ''}</span><span class="st-pill ${tt}">${!t.token ? 'none' : left <= 0 ? 'expired' : left < 120 ? 'expiring' : 'valid'}</span></div>
       <div class="rl-tk-bar"><i style="--w:${pctLeft}%"></i></div>
       <div class="rl-tk-f"><span>${left == null ? 'No expiry known' : left <= 0 ? 'Expired' : `${Math.floor(left / 60)} h ${left % 60} min left`}</span><span>${t.auto_renew ? 'renews by itself' : html`<a href="#/market">paste a fresh one daily</a>`}${t.renew_error ? html` · <b class="bad">${t.renew_error}</b>` : ''}</span></div></div>`);
 
@@ -353,9 +353,9 @@ function paintSockets(r) {
   const hitPct = f => (f && f.requests ? Math.round((Math.min(f.hits, f.requests) / f.requests) * 100) : null);
   const all = rest.requests ? Math.round(100 * (1 - (rest.dhan_calls || 0) / rest.requests)) : null;
   put($('#rl-rest'), html`<div class="rl-rest">
-      <div class="rl-ring" style="--p:${all == null ? 0 : Math.max(0, all)}"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" pathLength="100" class="tr"/><circle cx="40" cy="40" r="34" pathLength="100" class="va"/></svg><div><b>${all == null ? '—' : `${Math.max(0, all)}%`}</b><span>never reached Dhan</span></div></div>
-      <div class="rl-fams">${F.map(([k, l]) => { const f = fam[k] || {}, h = hitPct(f); return html`<div><span>${l}</span><b>${num(f.requests || 0)}</b><small>${h == null ? 'no requests yet' : `${h}% shared or cached · ${num(f.dhan || 0)} to Dhan`}</small></div>`; })}
-        <div><span>Dhan answers in</span><b>${ms(rest.dhan_ms?.p50)}</b><small>p95 ${ms(rest.dhan_ms?.p95)} · ${num(rest.dhan_429 || 0)} rate-limited · queue ${Math.max(...Object.values(rest.backlog_s || { a: 0 }))} s</small></div></div></div>`);
+      <div class="rl-ring" style="--p:${all == null ? 0 : Math.max(0, all)}"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="34" pathLength="100" class="tr"/><circle cx="40" cy="40" r="34" pathLength="100" class="va"/></svg><div><b>${all == null ? '—' : `${Math.max(0, all)}%`}</b><span>never reached EIMC-DATA</span></div></div>
+      <div class="rl-fams">${F.map(([k, l]) => { const f = fam[k] || {}, h = hitPct(f); return html`<div><span>${l}</span><b>${num(f.requests || 0)}</b><small>${h == null ? 'no requests yet' : `${h}% shared or cached · ${num(f.dhan || 0)} to EIMC-DATA`}</small></div>`; })}
+        <div><span>EIMC-DATA answers in</span><b>${ms(rest.dhan_ms?.p50)}</b><small>p95 ${ms(rest.dhan_ms?.p95)} · ${num(rest.dhan_429 || 0)} rate-limited · queue ${Math.max(...Object.values(rest.backlog_s || { a: 0 }))} s</small></div></div></div>`);
 }
 
 function paintAlerts(d) {
@@ -451,8 +451,8 @@ async function onClick(e) {
   if (b.dataset.ack) return act(b, () => api.do('relayAlertAck', b.dataset.ack), 'Acknowledged').then(poll, () => {});
   const a = b.dataset.act;
   if (a === 'restart') {
-    if (!await confirmBox('Restart the Dhan connection?', 'The relay closes its Dhan sockets and opens them again at once. Customers see a pause of a second or two. Use it when prices look stuck.', { label: 'Restart' })) return;
-    return act(b, () => api.do('relayRestart'), r => `Restarted ${r?.closed ?? 0} Dhan socket${r?.closed === 1 ? '' : 's'}`).then(() => setTimeout(poll, 1500), () => {});
+    if (!await confirmBox('Restart the EIMC-DATA connection?', 'The relay closes its EIMC-DATA sockets and opens them again at once. Customers see a pause of a second or two. Use it when prices look stuck.', { label: 'Restart' })) return;
+    return act(b, () => api.do('relayRestart'), r => `Restarted ${r?.closed ?? 0} EIMC-DATA socket${r?.closed === 1 ? '' : 's'}`).then(() => setTimeout(poll, 1500), () => {});
   }
   if (a === 'kick-all') {
     if (!await confirmBox('Reconnect every terminal?', `All ${num(D.relay?.connections || 0)} sockets close and every terminal reconnects by itself within a few seconds.`, { label: 'Reconnect everyone', danger: true })) return;
@@ -460,7 +460,7 @@ async function onClick(e) {
   }
   if (a === 'deep') {
     const cur = D.policy?.relay_deep, def = (D.relay?.limits?.deep_default || []).join(', ') || 'none';
-    const r = await modal({ title: '200-level order books', text: 'Dhan streams 200 levels for one book per socket, and allows 5 sockets in all: the live feed, the 20-level books, and up to 3 of these. Index futures roll to the next month by themselves.',
+    const r = await modal({ title: '200-level order books', text: 'EIMC-DATA streams 200 levels for one book per socket, and allows 5 sockets in all: the live feed, the 20-level books, and up to 3 of these. Index futures roll to the next month by themselves.',
       body: html`<div class="fld wide"><label>Books (up to 3, comma separated)</label><input name="spec" class="mono" value="${cur ?? ''}" placeholder="${def}"></div>
         <div class="rl-presets">${['NIFTY-FUT', 'BANKNIFTY-FUT', 'FINNIFTY-FUT', 'MIDCPNIFTY-FUT', 'SENSEX-FUT'].map(p => html`<button type="button" class="chip" data-preset="${p}">${p}</button>`)}</div>
         <p class="mini">Empty = the relay's default (${def}). Customers' terminals switch within about 15 seconds.</p>`,

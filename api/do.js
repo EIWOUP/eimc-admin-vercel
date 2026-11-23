@@ -14,7 +14,7 @@ const bool = v => v === true || v === 'true' || v === 1;
 const id = v => { const s = String(v ?? ''); if (!/^\d{1,18}$/.test(s)) throw new UserError('Bad id.'); return s; };
 const pick = (v, list, label) => { if (!list.includes(v)) throw new UserError(`Choose a valid ${label}.`); return v; };
 const date = (v, label) => { if (v == null || v === '') return null; const d = new Date(v); if (isNaN(d)) throw new UserError(`${label} is not a valid date.`); return d.toISOString(); };
-const ver = (v, label = 'The version') => { const s = str(v, 30).replace(/^v/i, ''); if (!/^\d+(\.\d+){1,3}$/.test(s)) throw new UserError(`${label} must look like 1.26.0.0`); return s; };
+const ver = (v, label = 'The version') => { const s = str(v, 30).replace(/^v/i, ''); if (!/^\d+(\.\d+){1,3}$/.test(s)) throw new UserError(`${label} must look like 1.25.218.94`); return s; };
 const httpsUrl = (v, label) => {
   const s = nul(v, 500); if (!s) return null;
   let u; try { u = new URL(s); } catch { throw new UserError(`${label} is not a valid link.`); }
@@ -298,7 +298,7 @@ const actions = {
       restore: () => [`revoked = false`],
       devices: () => [`max_devices = $2`, Math.max(1, Math.min(50, +value || 1))],
       broker: () => [`broker_status = $2`, pick(value, ['connected', 'not connected', 'expired'], 'broker status')],
-      version: () => [`app_version = $2`, str(value, 40) || 'v1.25.218.93'],
+      version: () => [`app_version = $2`, str(value, 40) || 'v1.25.218.94'],
       key: () => {
         const k = str(value, 40).toUpperCase();
         if (!/^EIMC-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(k)) throw new UserError('Use the form EIMC-XXXX-XXXX-XXXX (letters and digits).');
@@ -370,7 +370,7 @@ const actions = {
   /* the go-live switch for live market data; only on with Dhan's written OK */
   async relaySwitch([on, confirmed]) {
     on = bool(on);
-    if (on && confirmed !== 'DHAN-CONFIRMED') throw new UserError('Tick the box confirming Dhan has approved this in writing first.');
+    if (on && confirmed !== 'DHAN-CONFIRMED') throw new UserError('Tick the box confirming EIMC-DATA has approved this in writing first.');
     await q(`UPDATE app_policy SET relay_enabled = $1, updated_at = now()`, [on]);
     await audit(null, null, on ? 'admin.relay.enabled' : 'admin.relay.disabled');
   },
@@ -401,7 +401,7 @@ const actions = {
     if (spec != null && spec !== 'default') {
       const parts = String(spec).split(',').map(s => s.trim()).filter(Boolean)
         .map(s => (/^[A-Za-z0-9&]+-FUT$/i.test(s) ? s.toUpperCase() : s));
-      if (parts.length > 3) throw new UserError('Dhan allows at most 3 books at 200 levels.');
+      if (parts.length > 3) throw new UserError('EIMC-DATA allows at most 3 books at 200 levels.');
       for (const p of parts) if (!/^[A-Z0-9&]+-FUT$/.test(p) && !/^(NSE_FNO|BSE_FNO|NSE_EQ|BSE_EQ|MCX_COMM):\d{1,12}$/.test(p))
         throw new UserError(`"${p}" is not a book: use an index future like NIFTY-FUT or a key like NSE_FNO:35001.`);
       v = [...new Set(parts)].join(',');
@@ -502,17 +502,17 @@ const actions = {
     if (key.length < 32) throw new UserError('EIMC_BROKER_KEY is not set on this server (32+ characters). Add it in Vercel, redeploy, then paste the token again.');
     const token = String(d.token ?? '').trim().replace(/^Bearer\s+/i, '');
     if (token.length > 4000 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token))
-      throw new UserError('That does not look like a Dhan access token (three parts separated by dots).');
+      throw new UserError('That does not look like a EIMC-DATA access token (three parts separated by dots).');
     let claims;
     try { claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8')); } catch { throw new UserError('That token could not be read.'); }
-    if (claims.iss && claims.iss !== 'dhan') throw new UserError('That token was not issued by Dhan.');
+    if (claims.iss && claims.iss !== 'dhan') throw new UserError('That token was not issued by EIMC-DATA.');
     const exp = Number(claims.exp);
-    if (!exp) throw new UserError('That token has no expiry, so it is not a Dhan access token.');
-    if (exp * 1000 <= Date.now()) throw new UserError('That token has already expired. Generate a new one on web.dhan.co.');
+    if (!exp) throw new UserError('That token has no expiry, so it is not a EIMC-DATA access token.');
+    if (exp * 1000 <= Date.now()) throw new UserError('That token has already expired. Generate a new one on the EIMC-DATA web portal.');
     const inToken = claims.dhanClientId ? String(claims.dhanClientId) : null;
     const clientId = nul(d.client_id, 20) || inToken;
-    if (!clientId || !/^\d{5,20}$/.test(clientId)) throw new UserError('Enter the Dhan client ID (digits).');
-    if (inToken && inToken !== clientId) throw new UserError(`This token belongs to Dhan client ••••${inToken.slice(-4)}, not the one entered.`);
+    if (!clientId || !/^\d{5,20}$/.test(clientId)) throw new UserError('Enter the EIMC-DATA client ID (digits).');
+    if (inToken && inToken !== clientId) throw new UserError(`This token belongs to EIMC-DATA client ••••${inToken.slice(-4)}, not the one entered.`);
     await q(`UPDATE house_broker SET client_id = $1, access_token_enc = pgp_sym_encrypt($2, $3), token_expires_at = to_timestamp($4),
                     updated_at = now(), updated_by = 'admin'`, [clientId, token, key, exp]);
     const expires = new Date(exp * 1000).toISOString();

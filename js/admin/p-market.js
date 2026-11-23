@@ -1,13 +1,13 @@
 'use strict';
 /* Market data: the one Dhan account every customer's live data comes from (through the relay),
-   the go-live switch, and the relay's health. Customers never need a Dhan account of their own.
-   The Dhan token is stored encrypted (EIMC_BROKER_KEY) and never comes back to this page. */
+   the go-live switch, and the relay's health. Customers never need a EIMC-DATA account of their own.
+   The EIMC-DATA token is stored encrypted (EIMC_BROKER_KEY) and never comes back to this page. */
 import { $, api, html, put, icon, num, dtime, ago, toast, act, modal, confirmBox } from './core.js';
 
 let D, CTX, timer;
 
 function tokenState(b) {
-  if (!b.token_set || !b.token_expires_at) return { pill: 'bad', label: 'No token', note: 'Paste a Dhan access token below.' };
+  if (!b.token_set || !b.token_expires_at) return { pill: 'bad', label: 'No token', note: 'Paste a EIMC-DATA access token below.' };
   const left = new Date(b.token_expires_at) - Date.now();
   if (left <= 0) return { pill: 'bad', label: 'Expired', note: `Expired ${ago(b.token_expires_at)}. Live data stops until a fresh token is pasted.` };
   const h = left / 36e5, mins = Math.max(1, Math.floor(left / 6e4));
@@ -22,16 +22,16 @@ export async function render(root, ctx) {
   D = await api.get('market');
   const b = D.broker, on = D.policy.relay_enabled, st = tokenState(b), r = D.relay, ev = D.relayEvents;
   put(root, html`
-  <div class="ph"><div><h1>Market <em>data</em></h1><p>One Dhan account feeds every customer through the relay. Customers never connect Dhan themselves.</p></div></div>
+  <div class="ph"><div><h1>Market <em>data</em></h1><p>One EIMC-DATA account feeds every customer through the relay. Customers never connect EIMC-DATA themselves.</p></div></div>
 
-  ${on ? '' : html`<div class="nt warn" style="margin-bottom:16px">${icon('alert')}<span><b>Live data is off for every customer.</b> The relay refuses all connections until you turn it on below. Turn it on only once Dhan has confirmed in writing that you may show this account's data to your subscribers.</span></div>`}
+  ${on ? '' : html`<div class="nt warn" style="margin-bottom:16px">${icon('alert')}<span><b>Live data is off for every customer.</b> The relay refuses all connections until you turn it on below. Turn it on only once EIMC-DATA has confirmed in writing that you may show this account's data to your subscribers.</span></div>`}
 
   <div class="g g2">
     <div class="card lit">
       <div class="card-h"><h2>${icon('zap')} Live data for customers</h2><div class="r">${on ? html`<span class="st-pill ok">On</span>` : html`<span class="st-pill mute">Off</span>`}</div></div>
       <p class="mini" style="margin:0 0 16px">${on
         ? 'Paid customers get live charts through the relay. Free customers and expired trials stay on demo data.'
-        : 'Every terminal runs on demo data. Nothing from the Dhan account reaches a customer.'}</p>
+        : 'Every terminal runs on demo data. Nothing from the EIMC-DATA account reaches a customer.'}</p>
       <div class="kvs" style="grid-template-columns:repeat(3,1fr)">${kv('Connections, 24 h', num(ev.connects))}${kv('Customers, 24 h', num(ev.users))}${kv('Drops, 24 h', num(ev.drops))}</div>
       <div class="qa mt20">${on
         ? html`<button type="button" class="btn btn-danger" data-relay="off">${icon('ban')}Turn live data off</button>`
@@ -50,18 +50,18 @@ export async function render(root, ctx) {
   </div>
 
   <form class="card glow lit mt20" id="f-token" novalidate autocomplete="off">
-    <div class="card-h"><h2>${icon('key')} House Dhan account</h2><div class="r"><span class="st-pill ${st.pill}" id="tok-pill">${st.label}</span></div></div>
-    ${D.keyConfigured ? '' : html`<div class="nt warn" style="margin-bottom:16px">${icon('alert')}<span><b>EIMC_BROKER_KEY is not set on this site.</b> It encrypts the Dhan token. Add a random value of 32+ characters in Vercel (the relay needs the same value), redeploy, then paste the token.</span></div>`}
+    <div class="card-h"><h2>${icon('key')} House EIMC-DATA account</h2><div class="r"><span class="st-pill ${st.pill}" id="tok-pill">${st.label}</span></div></div>
+    ${D.keyConfigured ? '' : html`<div class="nt warn" style="margin-bottom:16px">${icon('alert')}<span><b>EIMC_BROKER_KEY is not set on this site.</b> It encrypts the EIMC-DATA token. Add a random value of 32+ characters in Vercel (the relay needs the same value), redeploy, then paste the token.</span></div>`}
     <div class="kvs" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
-      ${kv('Dhan client', b.client_id ? `••••${b.client_id.slice(-4)}` : '—')}${kv('Token', b.token_set ? 'Saved (encrypted)' : 'None')}
+      ${kv('EIMC-DATA client', b.client_id ? `••••${b.client_id.slice(-4)}` : '—')}${kv('Token', b.token_set ? 'Saved (encrypted)' : 'None')}
       ${kv('Expires', b.token_expires_at ? dtime(b.token_expires_at) : '—')}${kv('Updated', b.updated_at && b.token_set ? ago(b.updated_at) : '—')}
     </div>
     <p class="mini" id="tok-note" style="margin:0 0 16px">${st.note}</p>
     <div class="form-g">
-      <div class="fld"><label>Dhan client ID</label><input name="client_id" inputmode="numeric" value="${b.client_id || ''}" placeholder="read from the token if blank"></div>
-      <div class="fld wide"><label>New access token</label><textarea name="token" rows="3" spellcheck="false" autocomplete="off" class="mono" placeholder="Paste the token from web.dhan.co → My Profile → Access DhanHQ APIs"></textarea></div>
+      <div class="fld"><label>EIMC-DATA client ID</label><input name="client_id" inputmode="numeric" value="${b.client_id || ''}" placeholder="read from the token if blank"></div>
+      <div class="fld wide"><label>New access token</label><textarea name="token" rows="3" spellcheck="false" autocomplete="off" class="mono" placeholder="Paste the token from the EIMC-DATA web portal → My Profile → Access APIs"></textarea></div>
     </div>
-    <div class="form-f"><span class="mini">Dhan tokens last 24 hours. Paste a fresh one each morning until automatic renewal is set up.</span>
+    <div class="form-f"><span class="mini">EIMC-DATA tokens last 24 hours. Paste a fresh one each morning until automatic renewal is set up.</span>
       <div class="btns">${b.token_set ? html`<button type="button" class="btn btn-sm btn-quiet" data-tok-clear>Remove token</button>` : ''}<button class="btn btn-sm btn-gold" type="submit">Save token</button></div></div>
   </form>`);
 }
@@ -91,7 +91,7 @@ export function mounted(view, ctx) {
     act(f.querySelector('[type=submit]'), () => api.do('houseToken', o), r => `Token saved, valid until ${dtime(r.token_expires_at)}`).then(again, () => {});
   });
   $('[data-tok-clear]', view)?.addEventListener('click', async e => {
-    if (!await confirmBox('Remove the Dhan token?', 'Live data stops for every customer until a new token is saved.', { label: 'Remove', danger: true })) return;
+    if (!await confirmBox('Remove the EIMC-DATA token?', 'Live data stops for every customer until a new token is saved.', { label: 'Remove', danger: true })) return;
     act(e.currentTarget, () => api.do('houseTokenClear'), 'Token removed').then(again, () => {});
   });
 
@@ -101,9 +101,9 @@ export function mounted(view, ctx) {
   });
   $('[data-relay="on"]', view)?.addEventListener('click', async () => {
     const r = await modal({ title: 'Turn live data on?', danger: true,
-      text: 'Paid customers start receiving live market data from the house Dhan account through the relay.',
-      body: html`<div class="nt warn" style="margin-bottom:14px">${icon('alert')}<span>Showing one Dhan account's live NSE data to paying customers may need Dhan's written approval and an exchange data licence. Do not turn this on without them.</span></div>
-        <label class="chk"><input type="checkbox" name="confirmed" value="DHAN-CONFIRMED"><span></span>Dhan has confirmed in writing that this is allowed</label>`,
+      text: 'Paid customers start receiving live market data from the house EIMC-DATA account through the relay.',
+      body: html`<div class="nt warn" style="margin-bottom:14px">${icon('alert')}<span>Showing one EIMC-DATA account's live NSE data to paying customers may need EIMC-DATA's written approval and an exchange data licence. Do not turn this on without them.</span></div>
+        <label class="chk"><input type="checkbox" name="confirmed" value="DHAN-CONFIRMED"><span></span>EIMC-DATA has confirmed in writing that this is allowed</label>`,
       actions: [{ label: 'Cancel', value: null, cls: 'btn-quiet' }, { label: 'Turn live data on', submit: true, cls: 'btn-gold' }],
       submit: o => api.do('relaySwitch', true, o.confirmed || '') });
     if (r) { toast('Live data is on'); again(); }

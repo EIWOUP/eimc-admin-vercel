@@ -115,7 +115,7 @@ export function mounted(view) {
   const preview = debounce(async () => {
     const v = fp.min_supported_version.value.trim().replace(/^v/i, '');
     lastPreview = null;
-    if (!/^\d+(\.\d+){1,3}$/.test(v)) return put(prev, html`<span style="color:var(--heat-t)">Use a version like 1.26.0.0</span>`);
+    if (!/^\d+(\.\d+){1,3}$/.test(v)) return put(prev, html`<span style="color:var(--heat-t)">Use a version like 1.25.218.94</span>`);
     if (v === NONE || /^0(\.0)*$/.test(v)) return put(prev, html`${icon('check')} Every build is allowed.`);
     try {
       const r = await api.get('cutoff', { version: v });
@@ -148,9 +148,9 @@ export function mounted(view) {
 
   /* releases */
   const relForm = (r = {}) => html`<div class="form-g">
-    <div class="fld"><label>Version</label><input name="version" class="mono" value="${r.version || ''}" placeholder="1.26.0.0" required></div>
+    <div class="fld"><label>Version</label><input name="version" class="mono" value="${r.version || ''}" placeholder="1.25.218.94" required></div>
     <div class="fld"><label>Channel</label><select name="channel">${['stable', 'beta'].map(c => html`<option value="${c}" ${c === (r.channel || 'stable') ? 'selected' : ''}>${cap(c)}</option>`)}</select></div>
-    <div class="fld wide"><label>Download link (https)</label><input name="download_url" value="${r.download_url || ''}" placeholder="https://…/EIMC-Setup-1.26.0.0.exe"></div>
+    <div class="fld wide"><label>Download link (https)</label><input name="download_url" value="${r.download_url || ''}" placeholder="https://…/EIMC-Setup-1.25.218.94.exe"></div>
     <div class="fld wide"><label>SHA-256 of the installer</label><input name="sha256" class="mono" value="${r.sha256 || ''}" placeholder="certutil -hashfile EIMC-Setup.exe SHA256"></div>
     <div class="fld"><label>Size (bytes)</label><input name="size_bytes" type="number" min="1" value="${r.size_bytes || ''}"></div>
     <div class="fld"><label>Released</label><input name="released_at" type="datetime-local" value="${isoLocal(r.released_at || new Date())}"></div>

@@ -379,7 +379,7 @@ async function access() {
 
 /* who a new minimum version would lock out (PCs still in use, on builds older than v) */
 async function cutoff(v) {
-  if (!/^\d+(\.\d+){1,3}$/.test(String(v || ''))) throw new UserError('Use a version like 1.26.0.0');
+  if (!/^\d+(\.\d+){1,3}$/.test(String(v || ''))) throw new UserError('Use a version like 1.25.218.94');
   return one(`SELECT count(*)::int AS pcs, count(DISTINCT d.user_id)::int AS accounts,
                      count(*) FILTER (WHERE d.last_seen > now() - interval '7 days')::int AS recent
                 FROM devices d WHERE ${ACTIVE_PC} AND eimc.version_is_older(coalesce(d.app_version, '0'), $1)`, [v]);

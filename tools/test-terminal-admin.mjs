@@ -146,7 +146,7 @@ async function main() {
   r = await doA('houseToken', { token: jwt({ iss: 'dhan', exp: Math.floor(Date.now() / 1000) - 60, dhanClientId: '1100000001' }) });
   ok(r.status === 400 && /expired/.test(r.json.error), 'expired token refused');
   r = await doA('houseToken', { token: good, client_id: '2200000002' });
-  ok(r.status === 400 && /belongs to Dhan client/.test(r.json.error), 'client id must match the token');
+  ok(r.status === 400 && /belongs to EIMC-DATA client/.test(r.json.error), 'client id must match the token');
   r = await doA('houseToken', { token: good });
   ok(r.status === 200 && r.json.client_id === '1100000001' && !r.text.includes(good.split('.')[1]), 'token saved; client read from it; token not echoed');
   const stored = (await sql(`SELECT pgp_sym_decrypt(access_token_enc, $1) AS t, access_token_enc::text LIKE '%' || $2 || '%' AS plain,
